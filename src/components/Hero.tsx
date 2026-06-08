@@ -179,8 +179,6 @@ export default function Hero() {
               color: effectiveMode === 'idle' ? undefined : config.wordmarkColor,
               textShadow: effectiveMode === 'idle' ? 'none' : config.wordmarkTextShadow,
               filter: config.wordmarkDropShadow,
-              // CRITICAL: never blur the wordmark
-              blur: 'none',
             }}
           >
             SIMBIOTIK

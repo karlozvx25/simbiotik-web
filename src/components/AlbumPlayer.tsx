@@ -5,7 +5,7 @@ import { memoriaNaturalTracks } from '../data/tracks';
 import { useAudio } from '../context/AudioContext';
 
 export default function AlbumPlayer() {
-  const { isPlaying, setIsPlaying, activeTrack, setActiveTrack, setHeroVisualMode } = useAudio();
+  const { isPlaying, setIsPlaying, setActiveTrack, setHeroVisualMode } = useAudio();
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
