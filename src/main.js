@@ -123,6 +123,51 @@ document.addEventListener('DOMContentLoaded', () => {
   // Escuchar redimensionamiento de pantalla para recalcular posiciones de scroll
   window.addEventListener('resize', updateSidebarState);
 
+  // Helper unificado para obtener el scroll Y exacto para centrar o alinear cada sección
+  const getTargetScrollForSection = (section) => {
+    if (!section) return 0;
+
+    const rect = section.getBoundingClientRect();
+    const sectionTop = window.scrollY + rect.top;
+    const sectionHeight = rect.height;
+    const viewportHeight = window.innerHeight;
+
+    // Caso Especial 1: Simbiosis Sonido (centro magnético en la rotación frontal a la mitad del scroll)
+    if (section.id === 'simbiosis-sonido') {
+      return sectionTop + viewportHeight;
+    }
+
+    // Caso Especial 2: Manifiesto (se alinea para que el subtítulo y tarjetas queden visibles)
+    if (section.id === 'manifiesto') {
+      const headerHeight = document.querySelector('.navbar')?.offsetHeight || 60;
+      const techSubtitle = section.querySelector('.tech-subtitle');
+      if (techSubtitle) {
+        const subRect = techSubtitle.getBoundingClientRect();
+        return window.scrollY + subRect.top - headerHeight - 25;
+      }
+    }
+
+    // Caso Especial 3: Offsets específicos para otras secciones de la página
+    const sectionOffsets = {
+      'memoria-intro': -20,
+      'simbolo': -25
+    };
+    
+    if (sectionOffsets[section.id] !== undefined) {
+      return sectionTop + sectionOffsets[section.id];
+    }
+
+    // Caso Estándar:
+    if (sectionHeight <= viewportHeight) {
+      // Centrar verticalmente en pantalla si cabe completo
+      return sectionTop + sectionHeight / 2 - viewportHeight / 2;
+    } else {
+      // Alinear al tope de la sección con offset para el navbar
+      const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 60;
+      return sectionTop - navbarHeight;
+    }
+  };
+
   function raf(time) {
     lenis.raf(time);
     requestAnimationFrame(raf);
@@ -438,43 +483,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       isNavigating = true;
 
-      if (targetId === '#manifiesto') {
-        const headerHeight = document.querySelector('.navbar')?.offsetHeight || 0;
-        const techSubtitle = targetSection.querySelector('.tech-subtitle');
-        if (techSubtitle) {
-          const rect = techSubtitle.getBoundingClientRect();
-          const targetY = window.scrollY + rect.top - headerHeight - 25;
-          lenis.scrollTo(targetY, { 
-            duration: 1.5,
-            onComplete: () => {
-              setTimeout(() => { isNavigating = false; }, 100);
-            }
-          });
-        } else {
-          isNavigating = false;
+      const targetY = getTargetScrollForSection(targetSection);
+      lenis.scrollTo(targetY, { 
+        duration: 1.5,
+        onComplete: () => {
+          setTimeout(() => { isNavigating = false; }, 100);
         }
-      } else if (targetId === '#simbiosis-sonido') {
-        const rect = targetSection.getBoundingClientRect();
-        const targetY = window.scrollY + rect.top + window.innerHeight;
-        lenis.scrollTo(targetY, { 
-          duration: 1.5,
-          onComplete: () => {
-            setTimeout(() => { isNavigating = false; }, 100);
-          }
-        });
-      } else {
-        const sectionOffsets = {
-          '#memoria-intro': -20,
-          '#simbolo': -25
-        };
-        lenis.scrollTo(targetSection, {
-          offset: sectionOffsets[targetId] || -60,
-          duration: 1.5,
-          onComplete: () => {
-            setTimeout(() => { isNavigating = false; }, 100);
-          }
-        });
-      }
+      });
     });
   });
 
@@ -511,19 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
         minDistance = distance;
         nearestSection = section;
         
-        // Calcular la posición ideal de scroll para centrar la sección
-        if (section.id === 'simbiosis-sonido') {
-          // El centro magnético de Simbiosis es en el punto medio de su scroll (scrollY = 2.0 * window.innerHeight)
-          // donde las letras están centradas y el logo frontal.
-          targetY = sectionTop + window.innerHeight;
-        } else if (sectionHeight <= viewportHeight) {
-          // Si cabe en el viewport, centrarla verticalmente
-          targetY = sectionTop + sectionHeight / 2 - viewportHeight / 2;
-        } else {
-          // Si es más alta que el viewport, alinearla al tope con offset para el navbar
-          const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 60;
-          targetY = sectionTop - navbarHeight;
-        }
+        targetY = getTargetScrollForSection(section);
       }
     });
 
