@@ -72,6 +72,20 @@ document.addEventListener('DOMContentLoaded', () => {
   let isSnapping = false;
   let isNavigating = false;
 
+  const sidebarLinks = document.querySelector('.hero-sidebar-links');
+  const updateSidebarState = () => {
+    if (sidebarLinks) {
+      if (window.scrollY > 150) {
+        sidebarLinks.classList.add('scrolled');
+      } else {
+        sidebarLinks.classList.remove('scrolled');
+      }
+    }
+  };
+  
+  // Initial check on load
+  updateSidebarState();
+
   function raf(time) {
     lenis.raf(time);
     requestAnimationFrame(raf);
@@ -254,86 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
     partCards.forEach(c => c.classList.remove('hover'));
   }
 
-  // 7. SELECTOR DE ESTADOS (HERO SECTION)
-  // Cambia colores del WebGL dinámicamente representando los estados estéticos de la banda
-  const statusButtons = document.querySelectorAll('.status-btn');
-  const stateColors = {
-    idle: '#38bdf8',    // Fase Cero (Cyan base)
-    active: '#7f1d1d',  // Frecuencia Activa (Rojo Instinto)
-    core: '#6d28d9',    // Núcleo Revelado (Violeta)
-    memory: '#b88945',  // Memoria Dorada (Oro)
-    signal: '#1e40af'   // Señal Fría (Azul Eléctrico oscuro)
-  };
-
-  statusButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      statusButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      
-      const state = btn.getAttribute('data-state');
-      const section = btn.getAttribute('data-section');
-      const color = stateColors[state];
-      
-      // Hacer scroll a la sección correspondiente
-      if (section) {
-        const targetSection = document.getElementById(section);
-        if (targetSection) {
-          targetSection.classList.add('visible');
-
-          isNavigating = true;
-
-          if (section === 'manifiesto') {
-            const headerHeight = document.querySelector('.navbar')?.offsetHeight || 0;
-            const techSubtitle = targetSection.querySelector('.tech-subtitle');
-            if (techSubtitle) {
-              const rect = techSubtitle.getBoundingClientRect();
-              const targetY = window.scrollY + rect.top - headerHeight - 25;
-              lenis.scrollTo(targetY, { 
-                duration: 1.5,
-                onComplete: () => {
-                  setTimeout(() => { isNavigating = false; }, 100);
-                }
-              });
-            } else {
-              isNavigating = false;
-            }
-          } else if (section === 'simbiosis-sonido') {
-            const rect = targetSection.getBoundingClientRect();
-            const targetY = window.scrollY + rect.top + window.innerHeight;
-            lenis.scrollTo(targetY, {
-              duration: 1.5,
-              onComplete: () => {
-                setTimeout(() => { isNavigating = false; }, 100);
-              }
-            });
-          } else {
-            const sectionOffset = section === 'memoria-intro' ? -20 : section === 'simbolo' ? -25 : -60;
-            lenis.scrollTo(targetSection, {
-              offset: sectionOffset,
-              duration: 1.5,
-              onComplete: () => {
-                setTimeout(() => { isNavigating = false; }, 100);
-              }
-            });
-          }
-        }
-      }
-      
-      // Actualizar color base WebGL
-      webgl.updateColorTheme(color);
-      
-      // Cambiar texto de cabecera como un glitch
-      const headerLogo = document.querySelector('.logo');
-      const headerScramble = scramblers.find(s => s.el === headerLogo);
-      if (headerScramble) {
-        headerScramble.sc.setText(`SIMBIOTIK [${state.toUpperCase()}]`).then(() => {
-          setTimeout(() => {
-            headerScramble.sc.setText("SIMBIOTIK");
-          }, 2000);
-        });
-      }
-    });
-  });
+  // 7. SELECTOR DE ESTADOS (ELIMINADO)
 
   // 8. FORMULARIO DE CONTACTO
   const contactForm = document.getElementById('contact-form');
@@ -415,19 +350,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
         
-        // Iluminar botón de estado correspondiente y cambiar color del logo
+        // Cambiar color del logo 3D si corresponde
         const sectionMap = sectionStateMap[sectionId];
         if (sectionMap) {
-          // Actualizar botones de estado
-          document.querySelectorAll('.fixed-status-bar .status-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.getAttribute('data-section') === sectionId ||
-                btn.getAttribute('data-state') === sectionMap.state) {
-              btn.classList.add('active');
-            }
-          });
-          
-          // Cambiar color del logo 3D
           webgl.updateColorTheme(sectionMap.color);
         }
         
@@ -587,6 +512,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   lenis.on('scroll', (e) => {
+    updateSidebarState();
+
     if (snapTimeout) clearTimeout(snapTimeout);
 
     // Si el usuario está scrolleando activamente o navegando, cancelar la cola
