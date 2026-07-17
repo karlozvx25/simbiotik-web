@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="es" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>SIMBIOTIK | Donde la simbiosis humana se convierte en sonido</title>
+    <meta name="description" content="SimbiotiK es rock alternativo mexicano con visión global: oscuro, melódico, emocional, tecnológico y profundamente humano." />
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Inter:wght@300..600&display=swap" rel="stylesheet">
+  </head>
+  <body class="antialiased bg-simbiotik-deep text-text-primary selection:bg-simbiotik-violet/30 selection:text-text-primary">
+    
+    <!-- Canvas 3D de Fondo Permanente (Three.js WebGL) -->
+    <canvas id="webgl-canvas"></canvas>
+    
+    <!-- Overlay del logo SVG blanco (reemplaza al 3D en sección Símbolo) -->
+    <div class="logo-svg-overlay" id="logo-svg-overlay">
+      <img src="/SmbtK vectorwhite.svg" alt="SimbiotiK Logo" />
+    </div>
+
+    <!-- Fondo de Galaxias (para la sección Simbiosis) -->
+    <div class="galaxy-background"></div>
+
+    <!-- Overlay de Grid Técnico y Scanlines estilo Active Theory -->
+    <div class="tech-grid"></div>
+    <div class="scanlines"></div>
+    <div class="glow-overlay"></div>
+
+    <!-- Barra de Navegación Fija -->
+    <header class="navbar">
+      <div class="nav-container">
+        <div class="logo-wrapper">
+          <a href="#" class="logo scramble-text" data-text="SIMBIOTIK">SIMBIOTIK</a>
+          <div class="header-tech-tag">[ FRECUENCIA ACTIVA ]</div>
+        </div>
+        
+        <!-- Botones de Acción compactos a la derecha -->
+        <div class="header-buttons">
+          <a href="#memoria-intro" class="btn-header-primary">Escuchar ahora</a>
+          <a href="#manifiesto" class="btn-header-secondary">Ver manifiesto</a>
+        </div>
+
+        <!-- Menú Móvil Hamburger -->
+        <button class="menu-toggle" aria-label="Toggle Menu">
+          <span class="bar"></span>
+          <span class="bar"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Menú Móvil Desplegable -->
+    <div class="mobile-menu">
+      <a href="#inicio" data-sec="inicio">[ INICIO ]</a>
+      <a href="#simbiosis-sonido" data-sec="simbiosis">[ SIMBIOSIS ]</a>
+      <a href="#memoria-intro" data-sec="memoria">[ MEMORIA NATURAL ]</a>
+      <a href="#simbolo" data-sec="simbolo">[ SÍMBOLO ]</a>
+      <a href="#manifiesto" data-sec="manifiesto">[ MANIFIESTO ]</a>
+      <a href="#press-kit" data-sec="press-kit">[ PRESS KIT ]</a>
+      <a href="#contacto" data-sec="contacto">[ CONTACTO ]</a>
+    </div>
+
+    <!-- Contenido Principal -->
+    <main class="content-container">
+
+      <!-- HERO SECTION -->
+      <section id="inicio" class="section-pane visible active">
+        <!-- Lado Izquierdo Centro: Título -->
+        <div class="hero-left-center">
+          <h1 class="scramble-text hero-title" data-text="SIMBIOTIK">SIMBIOTIK</h1>
+        </div>
+
+        <!-- Lado Derecho: Enlaces de navegación vertical -->
+        <div class="hero-sidebar-links">
+          <a href="#inicio" class="active" data-sec="inicio">[ INICIO ]</a>
+          <a href="#simbiosis-sonido" data-sec="simbiosis">[ SIMBIOSIS ]</a>
+          <a href="#memoria-intro" data-sec="memoria">[ MEMORIA NATURAL ]</a>
+          <a href="#manifiesto" data-sec="manifiesto">[ MANIFIESTO ]</a>
+          <a href="#press-kit" data-sec="press-kit">[ PRESS KIT ]</a>
+          <a href="#contacto" data-sec="contacto">[ CONTACTO ]</a>
+        </div>
+
+      </section>
+
+      <!-- SECCIÓN SIMBIOSIS SONIDO -->
+      <section id="simbiosis-sonido" class="section-pane">
+        <div class="simbiosis-sticky-wrapper">
+          <div class="container text-center">
+            <h2 class="scramble-text simbiosis-title" data-text="Donde la simbiosis humana se convierte en sonido">
+              Donde la simbiosis humana se convierte en sonido
+            </h2>
+          </div>
+        </div>
+      </section>
+
+      <!-- MEMORIA NATURAL (MAPA SONORO) -->
+      <section id="memoria-intro" class="section-pane">
+        <div class="container">
+          <div class="section-header text-center">
+            <span class="tech-subtitle">[ PRIMER MAPA SONORO ]</span>
+            <h2 class="section-title scramble-text" data-text="MEMORIA NATURAL">MEMORIA NATURAL</h2>
+            <p class="section-desc max-w-xl mx-auto">
+              Memoria Natural es el primer mapa sonoro de SimbiotiK: un recorrido entre cuerpo, señal y memoria. Once canciones que exploran lo que permanece humano cuando el deseo, la tecnología, la sombra y la conciencia empiezan a fusionarse.
+            </p>
+          </div>
+
+          <!-- Reproductor de Audio Completo -->
+          <div class="audio-player-grid">
+            
+            <!-- Panel Izquierdo: Pista Activa (Glassmorphism) -->
+            <div class="active-track-panel glass-panel">
+              <div class="track-indicator">
+                <span class="track-act-label">ACTO <span id="player-act-num">I</span></span>
+                <span class="track-act-title" id="player-act-title">El impulso</span>
+              </div>
+              <div class="track-divider"></div>
+              
+              <div class="track-details">
+                <h3 class="track-title scramble-text" id="player-track-title" data-text="Dosis">Dosis</h3>
+                <div class="track-meta">
+                  <span class="meta-tag" id="player-track-territory">Instinto</span>
+                  <span class="meta-separator">•</span>
+                  <span class="meta-tag" id="player-track-mood">Cuerpo + Deseo</span>
+                </div>
+                <blockquote class="track-quote" id="player-track-quote">
+                  "El cuerpo pide antes que la mente entienda."
+                </blockquote>
+              </div>
+            </div>
+
+            <!-- Panel Derecho: Lista de Pistas (3 Actos) -->
+            <div class="tracklist-panel">
+              
+              <!-- Acto I -->
+              <div class="act-group" data-act="1">
+                <div class="act-header">
+                  <span class="act-number">ACTO I</span>
+                  <span class="act-name">El Impulso</span>
+                  <span class="act-message">"El cuerpo también transmite."</span>
+                </div>
+                <div class="tracks-container" id="act-1-tracks">
+                  <!-- JS will render tracks dynamically -->
+                </div>
+              </div>
+
+              <!-- Acto II -->
+              <div class="act-group" data-act="2">
+                <div class="act-header">
+                  <span class="act-number">ACTO II</span>
+                  <span class="act-name">La Señal</span>
+                  <span class="act-message">"La señal no inventa lo humano; lo revela."</span>
+                </div>
+                <div class="tracks-container" id="act-2-tracks">
+                  <!-- JS will render tracks -->
+                </div>
+              </div>
+
+              <!-- Acto III -->
+              <div class="act-group" data-act="3">
+                <div class="act-header">
+                  <span class="act-number">ACTO III</span>
+                  <span class="act-name">La Memoria Natural</span>
+                  <span class="act-message">"Lo que permanece no se recuerda: transmite."</span>
+                </div>
+                <div class="tracks-container" id="act-3-tracks">
+                  <!-- JS will render tracks -->
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- EL SÍMBOLO -->
+      <section id="simbolo" class="section-pane">
+        <div class="container flex-row-layout">
+          
+          <!-- Lado Izquierdo: Visualización e Interacción -->
+          <div class="symbol-visual-container">
+            <div class="symbol-graphic-wrapper">
+            </div>
+          </div>
+
+          <!-- Lado Derecho: Contenido de Explicación -->
+          <div class="symbol-text-panel">
+            <span class="tech-subtitle">[ SISTEMA ACTIVO ]</span>
+            <h2 class="section-title scramble-text" data-text="EL SÍMBOLO">EL SÍMBOLO</h2>
+            <p class="symbol-main-desc">
+              Dos rostros. Una conciencia dividida. Un núcleo donde la piel y la señal se convierten en frecuencia.
+            </p>
+
+            <div class="symbol-parts-list">
+              <div class="part-card glass-panel" id="part-circle" data-part="circle">
+                <div class="hotspot" data-part="circle">
+                  <span class="hotspot-dot"></span>
+                  <span class="hotspot-pulse"></span>
+                </div>
+                <div class="part-card-content">
+                  <h3 class="part-label">El Círculo</h3>
+                  <p class="part-desc">Representa sistema, ciclo, órbita y destino.</p>
+                </div>
+              </div>
+              <div class="part-card glass-panel" id="part-core" data-part="core">
+                <div class="hotspot" data-part="core">
+                  <span class="hotspot-dot"></span>
+                  <span class="hotspot-pulse"></span>
+                </div>
+                <div class="part-card-content">
+                  <h3 class="part-label">El Núcleo Central</h3>
+                  <p class="part-desc">Ojo, bocina, portal, frecuencia y corazón tecnológico.</p>
+                </div>
+              </div>
+              <div class="part-card glass-panel" id="part-top-lines" data-part="top-lines">
+                <div class="hotspot" data-part="top-lines">
+                  <span class="hotspot-dot"></span>
+                  <span class="hotspot-pulse"></span>
+                </div>
+                <div class="part-card-content">
+                  <h3 class="part-label">Líneas Superiores</h3>
+                  <p class="part-desc">Mente expandida y red neuronal.</p>
+                </div>
+              </div>
+              <div class="part-card glass-panel" id="part-bottom-lines" data-part="bottom-lines">
+                <div class="hotspot" data-part="bottom-lines">
+                  <span class="hotspot-dot"></span>
+                  <span class="hotspot-pulse"></span>
+                </div>
+                <div class="part-card-content">
+                  <h3 class="part-label">Líneas Inferiores</h3>
+                  <p class="part-desc">Raíces, cuerpo, sistema nervioso y descarga emocional.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- EL MANIFIESTO -->
+      <section id="manifiesto" class="section-pane">
+        <div class="container">
+          <div class="section-header text-center">
+            <span class="tech-subtitle">[ BRÚJULA ARTÍSTICA ]</span>
+            <h2 class="section-title scramble-text" data-text="EL MANIFIESTO">EL MANIFIESTO</h2>
+            <p class="section-desc max-w-xl mx-auto">
+              Diez principios que definen cómo suena, se siente y se construye el universo SimbiotiK.
+            </p>
+          </div>
+
+          <div class="manifiesto-grid" id="manifiesto-items-container">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- PRESS KIT -->
+      <section id="press-kit" class="section-pane">
+        <div class="container">
+          <div class="section-header text-center">
+            <span class="tech-subtitle">[ LA FORMACIÓN ]</span>
+            <h2 class="section-title scramble-text" data-text="PRESS KIT">PRESS KIT</h2>
+          </div>
+
+          <div class="press-grid">
+            <!-- Miembro 1 -->
+            <div class="member-card glass-panel">
+              <div class="member-avatar-placeholder">V</div>
+              <div class="member-info">
+                <h3 class="member-name">Karloz Vázquez</h3>
+                <span class="member-role">VOZ</span>
+              </div>
+            </div>
+            <!-- Miembro 2 -->
+            <div class="member-card glass-panel">
+              <div class="member-avatar-placeholder">G</div>
+              <div class="member-info">
+                <h3 class="member-name">Gonzalo Gutiérrez</h3>
+                <span class="member-role">GUITARRA LÍDER</span>
+              </div>
+            </div>
+            <!-- Miembro 3 -->
+            <div class="member-card glass-panel">
+              <div class="member-avatar-placeholder">D</div>
+              <div class="member-info">
+                <h3 class="member-name">Jorge Gutiérrez</h3>
+                <span class="member-role">BATERÍA</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Soporte Técnico / Staff -->
+          <div class="staff-section glass-panel">
+            <h3 class="staff-title">[ SISTEMA DE SOPORTE ]</h3>
+            <ul class="staff-list">
+              <li>Guitarra de apoyo</li>
+              <li>Tecladista</li>
+              <li>Coristas</li>
+              <li>VJ y pantalla / Visual System</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONTACTO -->
+      <section id="contacto" class="section-pane">
+        <div class="container max-w-xl">
+          <div class="section-header text-center">
+            <span class="tech-subtitle">[ SEÑAL / CONTACTO ]</span>
+            <h2 class="section-title scramble-text" data-text="CONTACTO">CONTACTO</h2>
+          </div>
+
+          <div class="contact-form-container glass-panel">
+            <form id="contact-form">
+              <div class="form-group">
+                <label for="form-name">NOMBRE</label>
+                <input type="text" id="form-name" required placeholder="Ingresa tu nombre..." />
+              </div>
+              <div class="form-group">
+                <label for="form-email">EMAIL / SEÑAL</label>
+                <input type="email" id="form-email" required placeholder="tu@correo.com..." />
+              </div>
+              <div class="form-group">
+                <label for="form-message">MENSAJE</label>
+                <textarea id="form-message" rows="5" required placeholder="Transmite tu mensaje..."></textarea>
+              </div>
+              <button type="submit" class="btn-primary w-full text-center">ENVIAR SEÑAL</button>
+            </form>
+            <div id="contact-success" class="contact-success hidden">
+              <div class="success-icon">✓</div>
+              <h3>SEÑAL TRANSMITIDA</h3>
+              <p>Tu mensaje ha sido enlazado al núcleo de SimbiotiK.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Selector de Estados Fijo (visible en scroll) -->
+    <div class="fixed-status-bar">
+      <div class="status-selector-vertical">
+        <button class="status-btn active" data-state="idle" data-section="inicio">FASE CERO</button>
+        <button class="status-btn" data-state="active" data-section="memoria-intro">FRECUENCIA ACTIVA</button>
+        <button class="status-btn" data-state="core" data-section="simbolo">NÚCLEO REVELADO</button>
+        <button class="status-btn" data-state="memory" data-section="manifiesto">MEMORIA DORADA</button>
+        <button class="status-btn" data-state="signal" data-section="contacto">SEÑAL FRÍA</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

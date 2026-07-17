@@ -1,0 +1,1361 @@
+import * as THREE from 'three';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import gsap from 'gsap';
+
+
+// Vertex Shader para las partículas de fondo (Restaurado al original)
+const vertexShader = `
+  uniform float uTime;
+  uniform float uAudioFreq;
+  uniform vec2 uMouse;
+  uniform float uNewSectionProgress;
+  attribute vec3 aRandoms;
+  varying vec3 vColor;
+  varying float vOpacity;
+
+  void main() {
+    vec3 pos = position;
+    
+    // Ruido sinusoidal e impulso del audio
+    float wave = sin(pos.x * 1.5 + uTime * 1.2) * cos(pos.y * 1.5 + uTime * 1.2) * 0.3;
+    pos.z += wave * (1.0 + uAudioFreq * 6.0);
+    
+    // Interacción con la posición normalizada del mouse
+    float distToMouse = distance(pos.xy, uMouse * 3.5);
+    if (distToMouse < 2.2) {
+      float force = (2.2 - distToMouse) * 0.45;
+      pos.z += force * sin(uTime * 6.0);
+      pos.x += force * uMouse.x * 0.2;
+      pos.y += force * uMouse.y * 0.2;
+    }
+    
+    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+    
+    // Modulación del tamaño según la cercanía y la frecuencia del bajo musical
+    gl_PointSize = (14.0 / -mvPosition.z) * (1.0 + uAudioFreq * 0.9);
+    
+    vColor = color;
+    vOpacity = (0.3 + 0.7 * sin(uTime * aRandoms.x + aRandoms.y)) * (1.0 - uNewSectionProgress);
+  }
+`;
+
+// Vertex Shader para las 5,000 partículas en columna espiral que caen desde la parte superior
+const spiralVertexShader = `
+  uniform float uTime;
+  uniform vec2 uMouse;
+  uniform float uNewSectionProgress;
+  attribute float aIndex;
+  attribute float aSizeScale;
+  attribute float aColorFactor;
+  attribute vec3 aRandomOffset; // x = velocidad vertical, y = velocidad angular, z = amplitud de deriva
+  varying vec3 vColor;
+  varying float vOpacity;
+
+  void main() {
+    // Ciclo de vida muy lento y personalizado
+    float lifetime = mod(uTime * 0.05 * aRandomOffset.x + aIndex * 0.0002, 1.0);
+    
+    // Cae lentamente desde la parte superior del hero (Y = 4.5) hacia abajo (Y = -4.5)
+    // Se añade una pequeña fluctuación senoidal para simular resistencia al caer (aleatorio/orgánico)
+    float y = 4.5 - (lifetime + sin(lifetime * 3.1415) * 0.05) * 9.0;
+    
+    // Espiral con rotación lenta y velocidad angular única por partícula
+    float angle = aIndex * 0.05 + y * 1.8 + uTime * (0.08 * aRandomOffset.y);
+    
+    // Radio de la espiral ensanchándose suavemente al descender
+    float radius = 0.15 + lifetime * 0.45;
+    
+    // Deriva horizontal lenta y aleatoria (efecto de polvo flotante/copos de nieve)
+    float driftX = sin(uTime * (0.35 * aRandomOffset.x) + aIndex) * aRandomOffset.z * 1.8;
+    float driftZ = cos(uTime * (0.3 * aRandomOffset.y) + aIndex * 1.3) * aRandomOffset.z * 1.8;
+    
+    vec3 pos = vec3(
+      cos(angle) * radius + driftX,
+      y,
+      sin(angle) * radius + driftZ
+    );
+    
+    // Interacción elástica con el cursor al pasar sobre ellas
+    vec2 mouseCoords = uMouse * 3.5;
+    float distToMouse = distance(pos.xy, mouseCoords);
+    if (distToMouse < 1.6) {
+      float force = (1.6 - distToMouse) * 0.45;
+      vec2 pushDir = normalize(pos.xy - mouseCoords + vec2(0.001));
+      pos.xy += pushDir * force * 0.7;
+      pos.z += sin(uTime * 3.0 + distToMouse * 6.0) * force * 0.5;
+    }
+    
+    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+    
+    // Tamaño de partícula aleatorio y variable (aspecto de la imagen) - se agranda en la nueva sección
+    gl_PointSize = (aSizeScale * 25.0 / -mvPosition.z) * (1.0 + uNewSectionProgress * 0.6);
+    
+    // Mezcla de colores Verde Aqua y Morado Neon
+    vec3 colorAqua = vec3(0.0, 0.96, 0.83); // Verde Aqua
+    vec3 colorPurple = vec3(0.85, 0.27, 0.93); // Morado Neon
+    vColor = mix(colorAqua, colorPurple, aColorFactor);
+    
+    // Opacidad de burbuja translúcida que se desvanece en los extremos
+    vOpacity = sin(lifetime * 3.14159) * (0.15 + aSizeScale * 0.35);
+  }
+`;
+
+// Fragment Shader (GLSL)
+const fragmentShader = `
+  varying vec3 vColor;
+  varying float vOpacity;
+
+  void main() {
+    // Dibuja círculos suaves en lugar de cuadrados ásperos
+    float dist = distance(gl_PointCoord, vec2(0.5));
+    if (dist > 0.5) discard;
+    
+    float alpha = smoothstep(0.5, 0.05, dist) * vOpacity;
+    gl_FragColor = vec4(vColor, alpha);
+  }
+`;
+
+// Fragment Shader para las partículas en espiral (Pellets Brillantes)
+const spiralFragmentShader = `
+  uniform float uNewSectionProgress;
+  varying vec3 vColor;
+  varying float vOpacity;
+
+  void main() {
+    float dist = distance(gl_PointCoord, vec2(0.5));
+    if (dist > 0.5) discard;
+
+    // 1. Apariencia original (círculo difuminado suave)
+    float alphaOriginal = smoothstep(0.5, 0.05, dist) * vOpacity;
+    vec4 colorOriginal = vec4(vColor, alphaOriginal);
+
+    // 2. Apariencia de Pellet Brillante (esfera 3D con luz difusa y brillo especular)
+    vec2 normalCoord = gl_PointCoord - vec2(0.5);
+    float r2 = dot(normalCoord, normalCoord);
+    float z = sqrt(max(0.25 - r2, 0.0));
+    vec3 normal = normalize(vec3(normalCoord, z));
+    
+    // Dirección de luz desde la esquina superior derecha delantera
+    vec3 lightDir = normalize(vec3(1.0, 1.0, 1.5));
+    float diffuse = max(dot(normal, lightDir), 0.0);
+    
+    vec3 viewDir = vec3(0.0, 0.0, 1.0);
+    vec3 halfDir = normalize(lightDir + viewDir);
+    float specular = pow(max(dot(normal, halfDir), 0.0), 20.0);
+    
+    // Pellet sumamente brillante con glow blanco y base de color
+    vec3 pelletColor = vColor * (diffuse * 0.8 + 0.3) + vec3(specular * 1.6);
+    // El pellet es sólido en el centro y se desvanece de golpe en los bordes
+    float alphaPellet = smoothstep(0.5, 0.45, dist) * (vOpacity * 1.4);
+    vec4 colorPellet = vec4(pelletColor, alphaPellet);
+
+    // Mezclar ambos estados según la transición de sección y desvanecer al entrar
+    gl_FragColor = mix(colorOriginal, colorPellet, uNewSectionProgress) * (1.0 - uNewSectionProgress);
+  }
+`;
+
+export class SimbiotikWebGL {
+  constructor() {
+    this.canvas = document.getElementById('webgl-canvas');
+    if (!this.canvas) return;
+
+    this.renderer = new THREE.WebGLRenderer({ 
+      canvas: this.canvas, 
+      antialias: true, 
+      alpha: true,
+      powerPreference: "high-performance"
+    });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+    this.scene = new THREE.Scene();
+    
+    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    this.camera.position.z = 6;
+
+    this.uniforms = {
+      uTime: { value: 0 },
+      uAudioFreq: { value: 0 },
+      uMouse: { value: new THREE.Vector2(0, 0) },
+      uNewSectionProgress: { value: 0 }
+    };
+
+    this.logoMesh = null;
+    this.logoSpinSpeed = 0.005;
+    this.colorTheme = new THREE.Color("#38bdf8"); // Azul inicial (Fase Cero)
+    this.logoVertices = null;
+    this.logoParticles = null;
+    this.logoParticleMode = false;
+
+    this.initParticles();
+    this.initSpiralParticles();
+    this.initPlaceholderLogo();
+    this.initTunnel();
+    this.initGrass();
+    this.bindEvents();
+    this.animate();
+  }
+
+  // Fondo de Partículas dispersas en forma de anillo tecnológico (Restaurado al original)
+  initParticles() {
+    const count = 12000;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const randoms = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      // Distribución cilíndrica para simular una red
+      const theta = Math.random() * Math.PI * 2;
+      const radius = 2.0 + Math.random() * 4.0;
+      positions[i * 3] = Math.cos(theta) * radius;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 8.0;
+      positions[i * 3 + 2] = Math.sin(theta) * radius;
+
+      // Color base
+      colors[i * 3] = this.colorTheme.r;
+      colors[i * 3 + 1] = this.colorTheme.g;
+      colors[i * 3 + 2] = this.colorTheme.b;
+
+      // Randoms para animar en shader
+      randoms[i * 3] = 0.5 + Math.random() * 2.0;    // Velocidad
+      randoms[i * 3 + 1] = Math.random() * Math.PI;  // Fase
+      randoms[i * 3 + 2] = Math.random();
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('aRandoms', new THREE.BufferAttribute(randoms, 3));
+
+    this.particleMaterial = new THREE.ShaderMaterial({
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms: this.uniforms,
+      transparent: true,
+      depthWrite: false,
+      vertexColors: true,
+      blending: THREE.AdditiveBlending
+    });
+
+    this.particleSystem = new THREE.Points(geometry, this.particleMaterial);
+    this.scene.add(this.particleSystem);
+  }
+
+  // Columna de 5,000 partículas que brotan del centro hacia abajo en espiral
+  initSpiralParticles() {
+    const count = 5000;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const indices = new Float32Array(count);
+    const sizeScales = new Float32Array(count);
+    const colorFactors = new Float32Array(count);
+    const randomOffsets = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      // Las coordenadas iniciales se definen en el origen (0,0,0)
+      positions[i * 3] = 0;
+      positions[i * 3 + 1] = 0;
+      positions[i * 3 + 2] = 0;
+      indices[i] = i;
+      
+      // Tamaño aleatorio variable (algunas pequeñas, medianas y burbujas grandes)
+      sizeScales[i] = 0.2 + Math.random() * 2.3;
+      
+      // Factor de mezcla de color para combinar Verde Aqua y Morado Neon
+      colorFactors[i] = Math.random();
+      
+      // Multiplicadores aleatorios para dar variedad orgánica al movimiento lento:
+      randomOffsets[i * 3] = 0.7 + Math.random() * 0.6;     // Velocidad vertical
+      randomOffsets[i * 3 + 1] = 0.5 + Math.random() * 1.0; // Velocidad de rotación
+      randomOffsets[i * 3 + 2] = 0.1 + Math.random() * 0.4; // Deriva horizontal lateral
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('aIndex', new THREE.BufferAttribute(indices, 1));
+    geometry.setAttribute('aSizeScale', new THREE.BufferAttribute(sizeScales, 1));
+    geometry.setAttribute('aColorFactor', new THREE.BufferAttribute(colorFactors, 1));
+    geometry.setAttribute('aRandomOffset', new THREE.BufferAttribute(randomOffsets, 3));
+
+    this.spiralTimeUniform = { value: 0 };
+
+    this.spiralMaterial = new THREE.ShaderMaterial({
+      vertexShader: spiralVertexShader,
+      fragmentShader: spiralFragmentShader,
+      uniforms: {
+        uTime: this.spiralTimeUniform,
+        uMouse: this.uniforms.uMouse,
+        uNewSectionProgress: this.uniforms.uNewSectionProgress
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    this.spiralSystem = new THREE.Points(geometry, this.spiralMaterial);
+    this.scene.add(this.spiralSystem);
+  }
+
+  // Genera un logotipo placeholder en 3D (Círculos concéntricos y un núcleo de luz)
+  // en el centro del Hero, el cual girará hasta que el usuario suba el archivo .glb
+  initPlaceholderLogo() {
+    this.logoGroup = new THREE.Group();
+    this.scene.add(this.logoGroup);
+
+    // 1. Núcleo central luminoso
+    const coreGeo = new THREE.SphereGeometry(0.4, 32, 32);
+    const coreMat = new THREE.MeshPhysicalMaterial({
+      color: this.colorTheme,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      metalness: 0.0,
+      roughness: 0.0,
+      transmission: 0.0
+    });
+    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+    this.logoGroup.add(coreMesh);
+
+    // 2. Anillo exterior giratorio
+    const ringGeo = new THREE.RingGeometry(1.2, 1.25, 64);
+    const ringMat = new THREE.MeshPhysicalMaterial({
+      color: this.colorTheme,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.4,
+      metalness: 0.0,
+      roughness: 0.0,
+      transmission: 0.0
+    });
+    this.outerRing = new THREE.Mesh(ringGeo, ringMat);
+    this.logoGroup.add(this.outerRing);
+
+    // 3. Algunas líneas orbitantes
+    const points = [];
+    for (let i = 0; i <= 64; i++) {
+      const theta = (i / 64) * Math.PI * 2;
+      points.push(new THREE.Vector3(Math.cos(theta) * 0.8, 0, Math.sin(theta) * 0.8));
+    }
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+    const lineMat = new THREE.LineBasicMaterial({ color: this.colorTheme, transparent: true, opacity: 0.3 });
+    this.innerRing = new THREE.Line(lineGeo, lineMat);
+    this.innerRing.rotation.x = Math.PI / 4;
+    this.logoGroup.add(this.innerRing);
+    this.sampleLogoVertices();
+  }
+
+  // Genera el túnel 3D de bloques metálicos púrpuras y luces de neón (5000 bloques con InstancedMesh)
+  initTunnel() {
+    this.tunnelGroup = new THREE.Group();
+    this.scene.add(this.tunnelGroup);
+    
+    this.tunnelScrollOffset = 0;
+    
+    // Material metálico púrpura oscuro brillante para los bloques
+    this.blockMaterial = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color("#0c021f"), // Púrpura muy oscuro
+      metalness: 0.95,
+      roughness: 0.15,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      transparent: true,
+      opacity: 0.0
+    });
+    
+    // Tiras de neón brillantes (fucsia/morado)
+    this.neonMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#e879f9"), // Fucsia
+      transparent: true,
+      opacity: 0.0
+    });
+    
+    this.neonPurpleMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#c084fc"), // Morado claro
+      transparent: true,
+      opacity: 0.0
+    });
+    
+    const blockGeo = new THREE.BoxGeometry(0.8, 0.15, 1.85);
+    const neonGeo = new THREE.BoxGeometry(0.08, 0.05, 1.87);
+    
+    // InstancedMesh de 5000 bloques y 5000 neones para rendimiento de 60FPS
+    this.blockInstanced = new THREE.InstancedMesh(blockGeo, this.blockMaterial, 5000);
+    this.neonInstanced = new THREE.InstancedMesh(neonGeo, this.neonMaterial, 5000);
+    
+    this.tunnelGroup.add(this.blockInstanced);
+    this.tunnelGroup.add(this.neonInstanced);
+    
+    this.instancedData = [];
+    const spacing = 3.0;
+    const countZ = 100; // 100 capas Z
+    const blocksPerLayer = 50; // 50 bloques por capa = 5000 bloques totales
+    
+    // Dimensiones gigantes para ocupar toda la pantalla en cualquier relación de aspecto
+    const radiusX = 6.8;
+    const radiusY = 3.8;
+    
+    let index = 0;
+    for (let l = 0; l < countZ; l++) {
+      const zBase = -l * spacing;
+      
+      for (let b = 0; b < blocksPerLayer; b++) {
+        let x = 0, y = 0, rotZ = 0;
+        let neonOffsetX = 0;
+        
+        if (b < 15) {
+          // Piso
+          const pct = b / 14;
+          x = -radiusX + pct * 2.0 * radiusX;
+          y = -radiusY;
+          rotZ = 0;
+          neonOffsetX = Math.random() > 0.5 ? 0.3 : -0.3;
+        } else if (b < 30) {
+          // Techo
+          const pct = (b - 15) / 14;
+          x = -radiusX + pct * 2.0 * radiusX;
+          y = radiusY;
+          rotZ = 0;
+          neonOffsetX = Math.random() > 0.5 ? 0.3 : -0.3;
+        } else if (b < 40) {
+          // Pared Izquierda
+          const pct = (b - 30) / 9;
+          x = -radiusX;
+          y = -radiusY + pct * 2.0 * radiusY;
+          rotZ = Math.PI / 2;
+          neonOffsetX = Math.random() > 0.5 ? 0.3 : -0.3;
+        } else {
+          // Pared Derecha
+          const pct = (b - 40) / 9;
+          x = radiusX;
+          y = -radiusY + pct * 2.0 * radiusY;
+          rotZ = Math.PI / 2;
+          neonOffsetX = Math.random() > 0.5 ? 0.3 : -0.3;
+        }
+        
+        // Pequeño desplazamiento aleatorio para un aspecto más orgánico y profundo
+        x += (Math.random() - 0.5) * 0.15;
+        y += (Math.random() - 0.5) * 0.15;
+        
+        this.instancedData.push({
+          initialX: x,
+          initialY: y,
+          initialZ: zBase,
+          rotZ: rotZ,
+          neonOffsetX: neonOffsetX,
+          index: index++
+        });
+      }
+    }
+    
+    // Esfera blanca luminosa (el centro brillante al fondo)
+    const glowGeo = new THREE.SphereGeometry(1.2, 32, 32);
+    this.glowMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#ffffff"),
+      transparent: true,
+      opacity: 0.0
+    });
+    this.glowMesh = new THREE.Mesh(glowGeo, this.glowMaterial);
+    this.glowMesh.position.set(0, 0, -250); // Empujada más al fondo del túnel largo
+    this.tunnelGroup.add(this.glowMesh);
+    
+    // Luces puntuales internas distribuidas a lo largo del túnel gigante
+    this.tunnelLights = [];
+    
+    const colors = [0xd946ef, 0xa855f7, 0x3b82f6];
+    for (let k = 0; k < 6; k++) {
+      const zLight = -k * 50 - 10;
+      const col = colors[k % colors.length];
+      const light = new THREE.PointLight(col, 4.0, 40);
+      light.position.set(0, 0, zLight);
+      light.initialIntensity = 4.0;
+      this.tunnelGroup.add(light);
+      this.tunnelLights.push(light);
+    }
+    
+    const finalWhiteLight = new THREE.PointLight(0xffffff, 10, 80);
+    finalWhiteLight.position.set(0, 0, -245);
+    finalWhiteLight.initialIntensity = 10.0;
+    this.tunnelGroup.add(finalWhiteLight);
+    this.tunnelLights.push(finalWhiteLight);
+  }
+
+  // Campo de pasto dinámico que aparece en la sección Manifiesto
+  initGrass() {
+    const count = 15000;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const heights = new Float32Array(count);
+    const phases = new Float32Array(count);
+    const sizes = new Float32Array(count);
+    const baseX = new Float32Array(count);
+    const baseZ = new Float32Array(count);
+    const greenShade = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      const x = (Math.random() - 0.5) * 28;
+      const z = (Math.random() - 0.5) * 28 - 3;
+      const h = 0.2 + Math.random() * 1.0;
+      positions[i * 3] = x;
+      positions[i * 3 + 1] = -2.0 + Math.random() * 0.1;
+      positions[i * 3 + 2] = z;
+      heights[i] = h;
+      phases[i] = Math.random() * Math.PI * 2;
+      sizes[i] = 0.03 + Math.random() * 0.04;
+      baseX[i] = x;
+      baseZ[i] = z;
+      greenShade[i] = 0.3 + Math.random() * 0.5;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('aHeight', new THREE.BufferAttribute(heights, 1));
+    geometry.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
+    geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+    geometry.setAttribute('aBaseX', new THREE.BufferAttribute(baseX, 1));
+    geometry.setAttribute('aBaseZ', new THREE.BufferAttribute(baseZ, 1));
+    geometry.setAttribute('aGreen', new THREE.BufferAttribute(greenShade, 1));
+
+    this.grassMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uMouse: this.uniforms.uMouse,
+        uWindStrength: { value: 1.0 },
+        uColor1: { value: new THREE.Color("#b88945") },
+        uColor2: { value: new THREE.Color("#4a7c3f") },
+        uOpacity: { value: 0 }
+      },
+      vertexShader: `
+        uniform float uTime;
+        uniform vec2 uMouse;
+        uniform float uWindStrength;
+        attribute float aHeight;
+        attribute float aPhase;
+        attribute float aSize;
+        attribute float aBaseX;
+        attribute float aBaseZ;
+        attribute float aGreen;
+        varying float vHeight;
+        varying float vGreen;
+
+        void main() {
+          float windX = sin(uTime * 0.7 + aBaseX * 1.8 + aPhase) * 0.35 * uWindStrength;
+          float windZ = cos(uTime * 0.5 + aBaseZ * 1.4 + aPhase * 0.7) * 0.25 * uWindStrength;
+          float sway = windX * aHeight + cos(uTime * 0.3 + aBaseX * 2.5) * 0.05 * aHeight;
+
+          vec3 pos = vec3(
+            position.x + sway,
+            position.y + aHeight * 0.5,
+            position.z + windZ * aHeight * 0.3
+          );
+
+          vec2 mouseCoords = uMouse * 3.5;
+          float dist = distance(pos.xz, mouseCoords);
+          if (dist < 1.8) {
+            float force = (1.8 - dist) * 0.4;
+            vec2 dir = normalize(pos.xz - mouseCoords + vec2(0.001));
+            pos.x += dir.x * force;
+            pos.z += dir.y * force;
+            pos.y += force * 0.2;
+          }
+
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = aSize * (140.0 / -mvPosition.z);
+          vHeight = aHeight;
+          vGreen = aGreen;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor1;
+        uniform vec3 uColor2;
+        uniform float uOpacity;
+        varying float vHeight;
+        varying float vGreen;
+
+        void main() {
+          float dist = distance(gl_PointCoord, vec2(0.5));
+          if (dist > 0.5) discard;
+
+          vec3 gold = uColor1;
+          vec3 green = uColor2;
+          vec3 bladeColor = mix(green, gold, vGreen);
+          float glow = 1.0 - smoothstep(0.0, 0.5, dist);
+          float alpha = glow * uOpacity * (0.5 + vGreen * 0.5);
+          gl_FragColor = vec4(bladeColor, alpha);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    this.grassSystem = new THREE.Points(geometry, this.grassMaterial);
+    this.grassSystem.visible = false;
+    this.scene.add(this.grassSystem);
+  }
+
+  // Carga del modelo 3D definitivo o extrusión a partir del vector SVG
+  loadLogoModel(url) {
+    if (url.endsWith('.svg')) {
+      this.loadLogoFromSVG(url);
+    } else if (url.endsWith('.gltf') || url.endsWith('.glb')) {
+      this.loadLogoFromGLTF(url);
+    } else {
+      this.loadLogoFromOBJ(url);
+    }
+  }
+
+  // Carga de archivo GLTF/GLB y autoescalado para mantener las dimensiones del actual logo
+  loadLogoFromGLTF(gltfUrl) {
+    const loader = new GLTFLoader();
+    
+    loader.load(gltfUrl, (gltf) => {
+      if (this.logoGroup) {
+        this.scene.remove(this.logoGroup);
+      }
+      
+      this.logoMesh = gltf.scene;
+      
+      const box = new THREE.Box3().setFromObject(this.logoMesh);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      
+      // La escala objetivo es la misma que la del logo SVG (aprox. 5.5 de dimensión máxima)
+      const targetSize = 5.5; 
+      const scale = targetSize / maxDim;
+      this.logoMesh.scale.set(scale, scale, scale);
+      
+      const center = box.getCenter(new THREE.Vector3());
+      this.logoMesh.position.x = -center.x * scale;
+      this.logoMesh.position.y = -center.y * scale;
+      this.logoMesh.position.z = -center.z * scale;
+      
+      this.logoGroup = new THREE.Group();
+      this.logoGroup.add(this.logoMesh);
+      this.scene.add(this.logoGroup);
+
+      this.logoMesh.traverse((child) => {
+        if (child.isMesh) {
+          child.material = new THREE.MeshPhysicalMaterial({
+            color: this.colorTheme.clone(),
+            transparent: true,
+            opacity: 0.4,                      // Transparencia del 40% frente al HTML
+            metalness: 0.0,                    // 0.0 Metálico (como en la imagen)
+            roughness: 0.0,                    // 0.0 Rugosidad (brillo perfecto)
+            transmission: 1.0,                 // 1.0 Transmisión (100% vidrio)
+            thickness: 2.5,                    // Espesor grueso para refracciones
+            ior: 2.65,                         // IOR de 2.65 (como en la imagen para refracción extrema)
+            iridescence: 0.3,                  // Aberración cromática irisada muy sutil en los bordes
+            iridescenceIOR: 1.3,
+            iridescenceThicknessRange: [100, 800],
+            clearcoat: 1.0,                    // Capa externa súper brillante
+            clearcoatRoughness: 0.0,
+            specularIntensity: 1.0,
+            specularColor: new THREE.Color("#ffffff"),
+            side: THREE.DoubleSide
+          });
+        }
+      });
+
+      this.addReflectiveLights();
+      this.sampleLogoVertices();
+      console.log("Logotipo 3D GLTF (Cristal Prismático) cargado exitosamente.");
+    }, undefined, (error) => {
+      console.error("Error cargando el modelo GLTF/GLB:", error);
+    });
+  }
+
+
+  // Carga y extrusión del archivo SVG a 3D con material de Cristal Prismático
+  loadLogoFromSVG(svgUrl) {
+    const loader = new SVGLoader();
+    
+    loader.load(svgUrl, (data) => {
+      // Remover el placeholder anterior
+      if (this.logoGroup) {
+        this.scene.remove(this.logoGroup);
+      }
+      
+      const paths = data.paths;
+      const group = new THREE.Group();
+      
+      // Ajustes de extrusión (grosor aumentado a 0.7 para darle presencia 3D sólida)
+      const extrudeSettings = {
+        depth: 0.7,
+        bevelEnabled: true,
+        bevelSegments: 5,
+        steps: 2,
+        bevelSize: 0.015,
+        bevelThickness: 0.03
+      };
+
+      // Material de Cromo Espejo Brillante
+      const chromeMaterial = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color("#e4e4e7"),   // Plata espejo brillante
+        metalness: 1.0,                      // 100% Metálico
+        roughness: 0.01,                     // Superficie de espejo altamente pulida
+        clearcoat: 1.0,                      // Capa externa de brillo
+        clearcoatRoughness: 0.01,
+        side: THREE.DoubleSide
+      });
+
+      for (let i = 0; i < paths.length; i++) {
+        const path = paths[i];
+        const shapes = SVGLoader.createShapes(path);
+        
+        for (let j = 0; j < shapes.length; j++) {
+          const shape = shapes[j];
+          const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+          const mesh = new THREE.Mesh(geometry, chromeMaterial.clone());
+          group.add(mesh);
+        }
+      }
+
+      // Los SVGs se cargan invertidos en el eje Y.
+      // Retornamos el tamaño a su escala original para mayor presencia visual (doble de tamaño)
+      group.scale.set(0.008, -0.008, 0.008);
+
+      // Centrar el pivote del grupo extruido
+      const box = new THREE.Box3().setFromObject(group);
+      const center = box.getCenter(new THREE.Vector3());
+      group.position.x = -center.x;
+      group.position.y = -center.y;
+      group.position.z = -center.z;
+
+      // Envolverlo en el grupo de rotación principal
+      this.logoMesh = group;
+      this.logoGroup = new THREE.Group();
+      this.logoGroup.add(this.logoMesh);
+      this.scene.add(this.logoGroup);
+
+      this.addReflectiveLights();
+      this.sampleLogoVertices();
+      console.log("Logotipo 3D extruido a partir de SVG (Cristal Prismático) cargado exitosamente.");
+    }, undefined, (error) => {
+      console.error("Error al cargar y extruir el archivo SVG:", error);
+    });
+  }
+
+  // Carga de archivo OBJ tradicional con material cristalino
+  loadLogoFromOBJ(objUrl) {
+    const loader = new OBJLoader();
+    
+    loader.load(objUrl, (obj) => {
+      if (this.logoGroup) {
+        this.scene.remove(this.logoGroup);
+      }
+      
+      this.logoMesh = obj;
+      
+      const box = new THREE.Box3().setFromObject(this.logoMesh);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      // Escala al doble de tamaño para máxima visualización
+      const scale = 2.8 / maxDim;
+      this.logoMesh.scale.set(scale, scale, scale);
+      
+      const center = box.getCenter(new THREE.Vector3());
+      this.logoMesh.position.x = -center.x * scale;
+      this.logoMesh.position.y = -center.y * scale;
+      this.logoMesh.position.z = -center.z * scale;
+      
+      this.logoGroup = new THREE.Group();
+      this.logoGroup.add(this.logoMesh);
+      this.scene.add(this.logoGroup);
+
+      this.logoMesh.traverse((child) => {
+        if (child.isMesh) {
+          child.material = new THREE.MeshPhysicalMaterial({
+            color: this.colorTheme.clone(),
+            transparent: true,
+            opacity: 0.4,                      // Transparencia del 40% frente al HTML
+            metalness: 0.0,                    // 0.0 Metálico (como en la imagen)
+            roughness: 0.0,                    // 0.0 Rugosidad (brillo perfecto)
+            transmission: 1.0,                 // 1.0 Transmisión (100% vidrio)
+            thickness: 2.5,                    // Espesor grueso para refracciones
+            ior: 2.65,                         // IOR de 2.65 (como en la imagen para refracción extrema)
+            iridescence: 0.3,                  // Aberración cromática irisada muy sutil en los bordes
+            iridescenceIOR: 1.3,
+            iridescenceThicknessRange: [100, 800],
+            clearcoat: 1.0,                    // Capa externa súper brillante
+            clearcoatRoughness: 0.0,
+            specularIntensity: 1.0,
+            specularColor: new THREE.Color("#ffffff"),
+            side: THREE.DoubleSide
+          });
+        }
+      });
+
+      this.addReflectiveLights();
+      this.sampleLogoVertices();
+      console.log("Logotipo 3D OBJ (Cristal Prismático) cargado exitosamente.");
+    }, undefined, (error) => {
+      console.error("Error cargando el modelo OBJ:", error);
+    });
+  }
+
+  // Agrega iluminación direccional para hacer resaltar el acabado cromado
+  addReflectiveLights() {
+    if (!this.lightsAdded) {
+      const dirLight1 = new THREE.DirectionalLight(0xffffff, 2.0);
+      dirLight1.position.set(5, 5, 5);
+      this.scene.add(dirLight1);
+
+      const dirLight2 = new THREE.DirectionalLight(0x0088ff, 1.5);
+      dirLight2.position.set(-5, -5, 5);
+      this.scene.add(dirLight2);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+      this.scene.add(ambientLight);
+      
+      this.lightsAdded = true;
+    }
+  }
+
+  // Mostrar/ocultar el logo 3D con transición (para reemplazarlo por SVG)
+  setLogoVisibility(visible) {
+    if (!this.logoGroup) return;
+    gsap.to(this.logoGroup.scale, {
+      x: visible ? 1 : 0,
+      y: visible ? 1 : 0,
+      z: visible ? 1 : 0,
+      duration: 0.6,
+      ease: 'power2.inOut'
+    });
+  }
+
+  // Muestrear vértices del logo 3D para convertirlos en partículas
+  sampleLogoVertices(maxCount = 8000) {
+    if (!this.logoGroup) return;
+    const tempVec = new THREE.Vector3();
+    const allPositions = [];
+
+    this.logoGroup.traverse((child) => {
+      if (child.isMesh && child.geometry) {
+        const pos = child.geometry.attributes.position;
+        if (!pos) return;
+        const matrix = child.matrixWorld;
+        for (let i = 0; i < pos.count; i++) {
+          tempVec.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+          tempVec.applyMatrix4(matrix);
+          allPositions.push(tempVec.clone());
+        }
+      }
+    });
+
+    if (allPositions.length === 0) return;
+
+    if (allPositions.length > maxCount) {
+      const step = allPositions.length / maxCount;
+      this.logoVertices = [];
+      for (let i = 0; i < maxCount; i++) {
+        this.logoVertices.push(allPositions[Math.floor(i * step)]);
+      }
+    } else {
+      this.logoVertices = allPositions;
+    }
+  }
+
+  // Crear sistema de partículas a partir de los vértices muestreados
+  createLogoParticles() {
+    if (!this.logoVertices || this.logoVertices.length === 0) return;
+
+    if (this.logoParticles) {
+      this.scene.remove(this.logoParticles);
+      this.logoParticles.geometry.dispose();
+      this.logoParticles.material.dispose();
+    }
+
+    const count = this.logoVertices.length;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    const offsets = new Float32Array(count * 3);
+    const randoms = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      const v = this.logoVertices[i];
+      positions[i * 3] = v.x;
+      positions[i * 3 + 1] = v.y;
+      positions[i * 3 + 2] = v.z;
+      sizes[i] = 0.04 + Math.random() * 0.08;
+      offsets[i * 3] = (Math.random() - 0.5) * 0.02;
+      offsets[i * 3 + 1] = (Math.random() - 0.5) * 0.02;
+      offsets[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+      randoms[i] = Math.random() * Math.PI * 2;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+    geometry.setAttribute('aOffset', new THREE.BufferAttribute(offsets, 3));
+    geometry.setAttribute('aRandom', new THREE.BufferAttribute(randoms, 1));
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: this.colorTheme.clone() },
+        uTime: { value: 0 },
+        uOpacity: { value: 0 }
+      },
+      vertexShader: `
+        uniform float uTime;
+        uniform float uOpacity;
+        attribute float aSize;
+        attribute vec3 aOffset;
+        attribute float aRandom;
+        varying vec3 vColor;
+        varying float vAlpha;
+
+        void main() {
+          float breathe = sin(uTime * 0.5 + aRandom) * 0.015;
+          float drift = sin(uTime * 0.3 + aRandom * 2.0) * 0.008;
+          vec3 pos = position + aOffset + vec3(drift, breathe, drift * 0.5);
+
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = aSize * (120.0 / -mvPosition.z);
+          vAlpha = uOpacity;
+          vColor = vec3(1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        varying float vAlpha;
+        varying vec3 vColor;
+
+        void main() {
+          float dist = distance(gl_PointCoord, vec2(0.5));
+          if (dist > 0.5) discard;
+
+          vec2 norm = gl_PointCoord - vec2(0.5);
+          float r2 = dot(norm, norm);
+          float z = sqrt(max(0.25 - r2, 0.0));
+          vec3 normal = normalize(vec3(norm, z));
+          vec3 lightDir = normalize(vec3(1.0, 1.0, 1.5));
+          float diffuse = max(dot(normal, lightDir), 0.0);
+          vec3 viewDir = vec3(0.0, 0.0, 1.0);
+          vec3 halfDir = normalize(lightDir + viewDir);
+          float specular = pow(max(dot(normal, halfDir), 0.0), 24.0);
+
+          vec3 pearlColor = uColor * (diffuse * 0.7 + 0.3) + vec3(specular * 1.8);
+          float alpha = smoothstep(0.5, 0.42, dist) * vAlpha;
+          gl_FragColor = vec4(pearlColor, alpha);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    this.logoParticles = new THREE.Points(geometry, material);
+    this.scene.add(this.logoParticles);
+  }
+
+  // Transicionar a modo partículas (descomposición del logo)
+  transitionToParticles() {
+    this.logoParticleMode = true;
+
+    // Logo → partículas
+    if (this.logoVertices && this.logoVertices.length > 0) {
+      if (!this.logoParticles) this.createLogoParticles();
+      if (this.logoParticles && this.logoParticles.material.uniforms) {
+        gsap.to(this.logoParticles.material.uniforms.uOpacity, {
+          value: 1, duration: 1.2, ease: 'power2.inOut'
+        });
+      }
+    }
+
+    gsap.to(this.logoGroup.scale, {
+      x: 0, y: 0, z: 0,
+      duration: 1.2,
+      ease: 'power2.inOut'
+    });
+
+    // Mostrar campo de pasto dinámico
+    if (this.grassSystem) {
+      this.grassSystem.visible = true;
+      if (this.grassMaterial) {
+        gsap.to(this.grassMaterial.uniforms.uOpacity, {
+          value: 0.7, duration: 1.5, ease: 'power2.inOut'
+        });
+      }
+    }
+  }
+
+  // Restaurar modo sólido
+  transitionToSolid() {
+    if (!this.logoParticleMode) return;
+    this.logoParticleMode = false;
+
+    // Ocultar pasto
+    if (this.grassSystem && this.grassMaterial) {
+      gsap.to(this.grassMaterial.uniforms.uOpacity, {
+        value: 0, duration: 0.8, ease: 'power2.inOut',
+        onComplete: () => { this.grassSystem.visible = false; }
+      });
+    }
+
+    if (this.logoParticles && this.logoParticles.material.uniforms) {
+      gsap.to(this.logoParticles.material.uniforms.uOpacity, {
+        value: 0,
+        duration: 0.8,
+        ease: 'power2.inOut',
+        onComplete: () => {
+          if (this.logoParticles) {
+            this.scene.remove(this.logoParticles);
+            this.logoParticles.geometry.dispose();
+            this.logoParticles.material.dispose();
+            this.logoParticles = null;
+          }
+        }
+      });
+    }
+
+    gsap.to(this.logoGroup.scale, {
+      x: 1, y: 1, z: 1,
+      duration: 0.8,
+      ease: 'power2.inOut'
+    });
+  }
+
+  // Actualizar la paleta de color base e interpolarla
+  updateColorTheme(colorHex) {
+    const targetColor = new THREE.Color(colorHex);
+    
+    // Interpolar color base usando GSAP
+    gsap.to(this.colorTheme, {
+      r: targetColor.r,
+      g: targetColor.g,
+      b: targetColor.b,
+      duration: 1.0,
+      onUpdate: () => {
+        // Actualizar el atributo de color en las partículas
+        const colors = this.particleSystem.geometry.attributes.color.array;
+        for (let i = 0; i < colors.length / 3; i++) {
+          colors[i * 3] = this.colorTheme.r;
+          colors[i * 3 + 1] = this.colorTheme.g;
+          colors[i * 3 + 2] = this.colorTheme.b;
+        }
+        this.particleSystem.geometry.attributes.color.needsUpdate = true;
+        
+        // Actualizar materiales de los placeholders o del logo
+        if (this.logoGroup) {
+          this.logoGroup.traverse((child) => {
+            if (child.isMesh) {
+              if (child.material.color) child.material.color.copy(this.colorTheme);
+              if (child.material.emissive) child.material.emissive.copy(this.colorTheme);
+            } else if (child.isLine) {
+              if (child.material.color) child.material.color.copy(this.colorTheme);
+            }
+          });
+        }
+      }
+    });
+  }
+
+  // Manejar el cambio de posición de la cámara según la sección activa (Efecto Cinematic Scroll)
+  triggerSectionTransition(sectionId) {
+    let targetCamZ = 6;
+    let targetCamY = 0;
+    let targetCamX = 0;
+    let targetRotationY = 0;
+    
+    // Transicionar logo a partículas al entrar a Manifiesto, restaurar al salir
+    if (sectionId === 'manifiesto') {
+      this.transitionToParticles();
+    } else if (this.logoParticleMode) {
+      this.transitionToSolid();
+    }
+    
+    switch (sectionId) {
+      case 'inicio':
+        targetCamZ = 6;
+        targetCamY = 0;
+        targetCamX = 0;
+        this.logoSpinSpeed = 0.005;
+        break;
+      case 'simbiosis-sonido':
+        targetCamZ = 6;
+        targetCamY = 0;
+        targetCamX = 0;
+        this.logoSpinSpeed = 0.005;
+        break;
+      case 'memoria-intro':
+        // Acercar la cámara a la derecha, dejando el logo cargado a la izquierda
+        targetCamZ = 4.5;
+        targetCamX = -1.2;
+        targetCamY = 0.2;
+        this.logoSpinSpeed = 0.002;
+        break;
+      case 'simbolo':
+        // Cámara se desplaza a la izquierda para que el logo 3D se vea solo la mitad derecha
+        targetCamZ = 3.5;
+        targetCamX = -3.5;
+        targetCamY = 0.0;
+        this.logoSpinSpeed = 0.001;
+        break;
+      case 'manifiesto':
+        // Alejar para mostrar toda la cuadrícula técnica de partículas
+        targetCamZ = 8.5;
+        targetCamX = 0.0;
+        targetCamY = -1.0;
+        this.logoSpinSpeed = 0.003;
+        break;
+      case 'press-kit':
+        // Rotación de cámara lateral
+        targetCamZ = 7.0;
+        targetCamX = 1.0;
+        targetCamY = 0.5;
+        this.logoSpinSpeed = 0.001;
+        break;
+      case 'contacto':
+        // Centrado íntimo
+        targetCamZ = 5.0;
+        targetCamX = 0.0;
+        targetCamY = -0.5;
+        this.logoSpinSpeed = 0.006;
+        break;
+    }
+
+    gsap.to(this.camera.position, {
+      x: targetCamX,
+      y: targetCamY,
+      z: targetCamZ,
+      duration: 1.8,
+      ease: "power2.inOut"
+    });
+  }
+
+  bindEvents() {
+    // Escuchar movimiento del mouse y normalizar coordenadas
+    window.addEventListener('mousemove', (e) => {
+      this.uniforms.uMouse.value.x = (e.clientX / window.innerWidth) * 2 - 1;
+      this.uniforms.uMouse.value.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    window.addEventListener('resize', () => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  }
+
+  animate() {
+    requestAnimationFrame(() => this.animate());
+    
+    // Incrementar variable de tiempo para ondas y ruido
+    this.uniforms.uTime.value += 0.012;
+    
+    // Simular pulsación sónica basada en ruido sinusoidal (mantiene el movimiento dinámico sin MP3)
+    const simulatedFreq = Math.abs(Math.sin(this.uniforms.uTime.value * 2.5)) * 0.15 + (Math.random() * 0.03);
+    this.uniforms.uAudioFreq.value = simulatedFreq;
+
+    // Calcular progreso de la sección Simbiosis Sonido
+    const simbiosisSection = document.getElementById('simbiosis-sonido');
+    let newSectionProgress = 0.0;
+    if (simbiosisSection) {
+      const rect = simbiosisSection.getBoundingClientRect();
+      const viewHeight = window.innerHeight;
+      // Distancia entre el centro de la sección y el centro de la pantalla
+      const sectionCenter = rect.top + rect.height / 2;
+      const viewportCenter = viewHeight / 2;
+      const dist = Math.abs(sectionCenter - viewportCenter);
+      // Pico en 1.0 al estar centrado, decae a 0.0 si está a más de una pantalla de distancia
+      newSectionProgress = Math.max(0.0, 1.0 - (dist / viewHeight));
+      
+      this.uniforms.uNewSectionProgress.value = newSectionProgress;
+
+      // Actualizar opacidad del fondo de galaxias animado en el DOM
+      const galaxyBg = document.querySelector('.galaxy-background');
+      if (galaxyBg) {
+        galaxyBg.style.opacity = newSectionProgress;
+      }
+    }
+
+    // Animar la columna de partículas (se pausa progresivamente hasta detenerse en la sección Simbiosis)
+    if (this.spiralTimeUniform) {
+      const spiralSpeed = 0.012 * (1.0 - newSectionProgress);
+      this.spiralTimeUniform.value += spiralSpeed;
+    }
+
+    // Animar túnel 3D de bloques púrpuras si estamos en la sección de Simbiosis
+    if (this.blockInstanced) {
+      if (newSectionProgress > 0) {
+        // Movimiento ligero y suave hacia el centro brillante (Z negativo) - 25% más rápido (0.005)
+        this.tunnelScrollOffset += 0.005 * (1.0 + simulatedFreq * 0.3);
+        
+        const spacing = 3.0;
+        const totalZ = 300.0; // spacing * countZ = 3.0 * 100 = 300.0
+        const maxZ = 0.0;
+        const minZ = -300.0;
+
+        // Mostrar túnel
+        this.tunnelGroup.visible = true;
+
+        const dummyBlock = new THREE.Object3D();
+        const dummyNeon = new THREE.Object3D();
+
+        this.instancedData.forEach((data) => {
+          let z = data.initialZ - (this.tunnelScrollOffset * spacing);
+          
+          // Loop circular para mantener el túnel infinito
+          z = z % totalZ;
+          if (z > maxZ) z -= totalZ;
+          if (z < minZ) z += totalZ;
+          
+          // Bloque
+          dummyBlock.position.set(data.initialX, data.initialY, z);
+          dummyBlock.rotation.set(0, 0, data.rotZ);
+          dummyBlock.updateMatrix();
+          this.blockInstanced.setMatrixAt(data.index, dummyBlock.matrix);
+          
+          // Neon
+          let neonX = data.initialX;
+          let neonY = data.initialY;
+          if (data.rotZ === 0) {
+            neonX += data.neonOffsetX;
+            neonY += 0.091;
+          } else {
+            neonX += 0.091;
+            neonY += data.neonOffsetX;
+          }
+          dummyNeon.position.set(neonX, neonY, z);
+          dummyNeon.rotation.set(0, 0, data.rotZ);
+          dummyNeon.updateMatrix();
+          this.neonInstanced.setMatrixAt(data.index, dummyNeon.matrix);
+        });
+
+        this.blockInstanced.instanceMatrix.needsUpdate = true;
+        this.neonInstanced.instanceMatrix.needsUpdate = true;
+
+        // Opacidad de los materiales instanciados
+        this.blockMaterial.opacity = newSectionProgress * 0.9;
+        this.neonMaterial.opacity = newSectionProgress * 1.0;
+
+        // Mostrar centro brillante y luces internas
+        if (this.glowMesh) {
+          this.glowMesh.material.opacity = newSectionProgress * 1.0;
+          const scale = 1.0 + simulatedFreq * 0.25;
+          this.glowMesh.scale.set(scale, scale, scale);
+        }
+
+        if (this.tunnelLights) {
+          this.tunnelLights.forEach((light) => {
+            light.intensity = (light.initialIntensity || 4.0) * newSectionProgress;
+          });
+        }
+      } else {
+        // Ocultar túnel completamente fuera de la sección para ahorrar rendimiento
+        this.tunnelGroup.visible = false;
+        
+        this.blockMaterial.opacity = 0;
+        this.neonMaterial.opacity = 0;
+        
+        if (this.glowMesh) {
+          this.glowMesh.material.opacity = 0;
+        }
+        if (this.tunnelLights) {
+          this.tunnelLights.forEach((light) => {
+            light.intensity = 0;
+          });
+        }
+      }
+    }
+    
+    // Rotar partículas globales
+    if (this.particleSystem) {
+      this.particleSystem.rotation.y += 0.0006;
+    }
+
+    // Rotar logotipo interactivo en base al scroll vertical (ajustado para dar exactamente la media vuelta en la sección Simbiosis)
+    if (this.logoGroup) {
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      
+      // La media vuelta (PI rad) se completa en el punto medio de la sección Simbiosis (scrollY = 2 * viewport height)
+      const targetScroll = 2.0 * window.innerHeight;
+      this.logoGroup.rotation.y = scrollY * (Math.PI / targetScroll);
+      
+      this.logoGroup.rotation.x = 0;
+      this.logoGroup.rotation.z = 0;
+      
+      // Logotipo estático en escala (sin vibración/pulsación de audio)
+      this.logoGroup.scale.set(1.0, 1.0, 1.0);
+
+      // Calcular el factor de oro basado en el ángulo de rotación Y
+      // (el coseno hace que el cambio sea suave: 0 en el frente, 1 al dar medio giro de 180 deg)
+      const angle = this.logoGroup.rotation.y;
+      const goldFactor = (1.0 - Math.cos(angle)) / 2.0;
+
+      // Hacer aparecer la frase "Donde la simbiosis humana se convierte en sonido"
+      // controlando su opacidad y elevación mediante el factor de oro en CSS
+      const simbiosisTitle = document.querySelector('.simbiosis-title');
+      if (simbiosisTitle) {
+        simbiosisTitle.style.opacity = Math.pow(goldFactor, 1.2); // Entrada más rápida y opaca
+        simbiosisTitle.style.setProperty('--gold-factor', goldFactor);
+      }
+
+      // Actualizar propiedades físicas del material para fundir a metal cromo brillante
+      this.logoGroup.traverse((child) => {
+        if (child.isMesh) {
+          const mat = child.material;
+          if (mat && mat.type === 'MeshPhysicalMaterial') {
+            // Transición a cromo pulido líquido en el reverso
+            mat.metalness = goldFactor; // 0.0 en el frente (vidrio), 1.0 al reverso (metal cromo)
+            mat.transmission = 1.0 - goldFactor; // 1.0 en el frente (transparente), 0.0 al reverso (opaco)
+            mat.roughness = 0.1 * goldFactor + 0.0 * (1.0 - goldFactor); // 0.1 para reflejos satinados metálicos suaves
+            mat.clearcoat = goldFactor * 1.0; // Capa de laca brillante líquida
+            mat.clearcoatRoughness = 0.02; // Reflejo secundario nítido
+            mat.opacity = 0.4 + goldFactor * 0.6; // 40% de opacidad en frente, 100% de opacidad al reverso
+            mat.transparent = true;
+            mat.thickness = 2.5 * (1.0 - goldFactor);
+            
+            // Interpolar color al blanco cromo brillante
+            const chromeColor = new THREE.Color("#ffffff");
+            mat.color.copy(this.colorTheme).lerp(chromeColor, goldFactor);
+          }
+        }
+      });
+    }
+    
+    // Animar partículas del logo (descomposición en perlas)
+    if (this.logoParticles && this.logoParticles.material.uniforms) {
+      this.logoParticles.material.uniforms.uTime.value += 0.016;
+      if (this.logoParticles.material.uniforms.uColor) {
+        this.logoParticles.material.uniforms.uColor.value.copy(this.colorTheme);
+      }
+    }
+
+    // Animar campo de pasto dinámico
+    if (this.grassSystem && this.grassSystem.visible && this.grassMaterial) {
+      this.grassMaterial.uniforms.uTime.value += 0.016;
+    }
+
+    // Carrusel horizontal del manifiesto: las tarjetas se deslizan de derecha a izquierda con el scroll
+    const manifiestoSection = document.getElementById('manifiesto');
+    const manifiestoGrid = document.getElementById('manifiesto-items-container');
+    if (manifiestoSection && manifiestoGrid) {
+      const rect = manifiestoSection.getBoundingClientRect();
+      const viewH = window.innerHeight;
+      const sectionH = rect.height;
+      const offset = rect.top;
+      const scrollable = sectionH - viewH;
+      let progress = 0;
+      if (scrollable > 0) {
+        progress = Math.max(0, Math.min(1, (-offset) / scrollable));
+      }
+      const gridWidth = manifiestoGrid.scrollWidth;
+      const maxTranslate = Math.max(0, gridWidth - window.innerWidth + 48);
+      manifiestoGrid.style.transform = `translateX(${-maxTranslate * progress}px)`;
+    }
+
+    if (this.outerRing) {
+      this.outerRing.rotation.z -= 0.004;
+    }
+    if (this.innerRing) {
+      this.innerRing.rotation.y += 0.01;
+    }
+
+    this.renderer.render(this.scene, this.camera);
+  }
+}
