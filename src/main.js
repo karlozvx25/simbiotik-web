@@ -74,17 +74,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const sidebarLinks = document.querySelector('.hero-sidebar-links');
   const updateSidebarState = () => {
-    if (sidebarLinks) {
-      if (window.scrollY > 150) {
-        sidebarLinks.classList.add('scrolled');
-      } else {
-        sidebarLinks.classList.remove('scrolled');
-      }
+    if (!sidebarLinks) return;
+
+    if (window.innerWidth <= 768) {
+      // En móviles, limpiar estilos en línea y dejar que CSS controle el flujo relativo
+      sidebarLinks.style.right = '';
+      sidebarLinks.style.top = '';
+      sidebarLinks.style.transform = '';
+      return;
     }
+
+    const scrollY = window.scrollY;
+    const viewportHeight = window.innerHeight;
+    const listHeight = sidebarLinks.offsetHeight || 300;
+
+    // La transición se completa al desplazarse 1.0 * viewportHeight (al salir del Hero)
+    const p = Math.min(1.0, Math.max(0.0, scrollY / viewportHeight));
+
+    // Suavizado cubic-ease-out para una transición más orgánica e interactiva
+    const easedP = 1 - Math.pow(1 - p, 3);
+
+    // Interpolación de coordenadas y transformaciones
+    const startTop = 0.4 * viewportHeight;
+    const endTop = viewportHeight - (listHeight * 0.75) - 40; // Se reduce un 25% (escala 0.75) y se alinea a 40px del borde inferior
+    const currentTop = startTop + (endTop - startTop) * easedP;
+
+    const startRight = 80;
+    const endRight = 40;
+    const currentRight = startRight + (endRight - startRight) * easedP;
+
+    const startScale = 1.0;
+    const endScale = 0.75; // Reducción del 25%
+    const currentScale = startScale + (endScale - startScale) * easedP;
+
+    const startTranslateY = -50;
+    const endTranslateY = 0;
+    const currentTranslateY = startTranslateY + (endTranslateY - startTranslateY) * easedP;
+
+    // Aplicar estilos directamente al elemento fixed
+    sidebarLinks.style.right = `${currentRight}px`;
+    sidebarLinks.style.top = `${currentTop}px`;
+    sidebarLinks.style.transform = `translateY(${currentTranslateY}%) scale(${currentScale})`;
   };
-  
+
   // Initial check on load
   updateSidebarState();
+
+  // Escuchar redimensionamiento de pantalla para recalcular posiciones de scroll
+  window.addEventListener('resize', updateSidebarState);
 
   function raf(time) {
     lenis.raf(time);
