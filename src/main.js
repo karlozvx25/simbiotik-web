@@ -69,6 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
     wheelMultiplier: 1.0
   });
 
+  let isSnapping = false;
+  let isNavigating = false;
+
   function raf(time) {
     lenis.raf(time);
     requestAnimationFrame(raf);
@@ -277,19 +280,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (targetSection) {
           targetSection.classList.add('visible');
 
+          isNavigating = true;
+
           if (section === 'manifiesto') {
             const headerHeight = document.querySelector('.navbar')?.offsetHeight || 0;
             const techSubtitle = targetSection.querySelector('.tech-subtitle');
             if (techSubtitle) {
               const rect = techSubtitle.getBoundingClientRect();
               const targetY = window.scrollY + rect.top - headerHeight - 25;
-              lenis.scrollTo(targetY, { duration: 1.5 });
+              lenis.scrollTo(targetY, { 
+                duration: 1.5,
+                onComplete: () => {
+                  setTimeout(() => { isNavigating = false; }, 100);
+                }
+              });
+            } else {
+              isNavigating = false;
             }
           } else {
             const sectionOffset = section === 'memoria-intro' ? -20 : section === 'simbolo' ? -25 : -60;
             lenis.scrollTo(targetSection, {
               offset: sectionOffset,
-              duration: 1.5
+              duration: 1.5,
+              onComplete: () => {
+                setTimeout(() => { isNavigating = false; }, 100);
+              }
             });
           }
         }
@@ -450,13 +465,22 @@ document.addEventListener('DOMContentLoaded', () => {
       // Hacer scroll suave hacia la sección
       if (targetSection) targetSection.classList.add('visible');
 
+      isNavigating = true;
+
       if (targetId === '#manifiesto') {
         const headerHeight = document.querySelector('.navbar')?.offsetHeight || 0;
         const techSubtitle = targetSection.querySelector('.tech-subtitle');
         if (techSubtitle) {
           const rect = techSubtitle.getBoundingClientRect();
           const targetY = window.scrollY + rect.top - headerHeight - 25;
-          lenis.scrollTo(targetY, { duration: 1.5 });
+          lenis.scrollTo(targetY, { 
+            duration: 1.5,
+            onComplete: () => {
+              setTimeout(() => { isNavigating = false; }, 100);
+            }
+          });
+        } else {
+          isNavigating = false;
         }
       } else {
         const sectionOffsets = {
@@ -465,7 +489,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         lenis.scrollTo(targetSection, {
           offset: sectionOffsets[targetId] || -60,
-          duration: 1.5
+          duration: 1.5,
+          onComplete: () => {
+            setTimeout(() => { isNavigating = false; }, 100);
+          }
         });
       }
     });
@@ -478,4 +505,74 @@ document.addEventListener('DOMContentLoaded', () => {
       menuToggle.classList.toggle('open');
     });
   }
+
+  // 11. CENTRO MAGNÉTICO (SCROLL SNAPPING AUTOMÁTICO)
+  let snapTimeout = null;
+
+  const performSnap = () => {
+    if (isSnapping || isNavigating) return;
+
+    const scrollY = window.scrollY;
+    const viewportHeight = window.innerHeight;
+    const viewportCenter = scrollY + viewportHeight / 2;
+
+    let nearestSection = null;
+    let minDistance = Infinity;
+    let targetY = 0;
+
+    sections.forEach(section => {
+      const rect = section.getBoundingClientRect();
+      const sectionTop = scrollY + rect.top;
+      const sectionHeight = rect.height;
+      const sectionCenter = sectionTop + sectionHeight / 2;
+      const distance = Math.abs(viewportCenter - sectionCenter);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestSection = section;
+        
+        // Calcular la posición ideal de scroll para centrar la sección
+        if (sectionHeight <= viewportHeight) {
+          // Si cabe en el viewport, centrarla verticalmente
+          targetY = sectionTop + sectionHeight / 2 - viewportHeight / 2;
+        } else {
+          // Si es más alta que el viewport, alinearla al tope con offset para el navbar
+          const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 60;
+          targetY = sectionTop - navbarHeight;
+        }
+      }
+    });
+
+    if (nearestSection) {
+      // Evitar micro-ajustes si ya está casi perfectamente centrado
+      if (Math.abs(targetY - scrollY) > 5) {
+        isSnapping = true;
+        
+        // Forzar visibilidad
+        nearestSection.classList.add('visible');
+
+        lenis.scrollTo(targetY, {
+          duration: 1.0,
+          easing: (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2, // easeInOutQuad
+          onComplete: () => {
+            setTimeout(() => {
+              isSnapping = false;
+            }, 150);
+          }
+        });
+      }
+    }
+  };
+
+  lenis.on('scroll', (e) => {
+    if (snapTimeout) clearTimeout(snapTimeout);
+
+    // Si el usuario está scrolleando activamente o navegando, cancelar la cola
+    if (isSnapping || isNavigating) return;
+
+    // Solo activar si la velocidad de scroll baja de un umbral (sugerencia de parada)
+    if (Math.abs(e.velocity) < 0.8) {
+      snapTimeout = setTimeout(performSnap, 250);
+    }
+  });
 });
