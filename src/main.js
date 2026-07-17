@@ -297,6 +297,15 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
               isNavigating = false;
             }
+          } else if (section === 'simbiosis-sonido') {
+            const rect = targetSection.getBoundingClientRect();
+            const targetY = window.scrollY + rect.top + window.innerHeight;
+            lenis.scrollTo(targetY, {
+              duration: 1.5,
+              onComplete: () => {
+                setTimeout(() => { isNavigating = false; }, 100);
+              }
+            });
           } else {
             const sectionOffset = section === 'memoria-intro' ? -20 : section === 'simbolo' ? -25 : -60;
             lenis.scrollTo(targetSection, {
@@ -482,6 +491,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           isNavigating = false;
         }
+      } else if (targetId === '#simbiosis-sonido') {
+        const rect = targetSection.getBoundingClientRect();
+        const targetY = window.scrollY + rect.top + window.innerHeight;
+        lenis.scrollTo(targetY, { 
+          duration: 1.5,
+          onComplete: () => {
+            setTimeout(() => { isNavigating = false; }, 100);
+          }
+        });
       } else {
         const sectionOffsets = {
           '#memoria-intro': -20,
@@ -532,7 +550,11 @@ document.addEventListener('DOMContentLoaded', () => {
         nearestSection = section;
         
         // Calcular la posición ideal de scroll para centrar la sección
-        if (sectionHeight <= viewportHeight) {
+        if (section.id === 'simbiosis-sonido') {
+          // El centro magnético de Simbiosis es en el punto medio de su scroll (scrollY = 2.0 * window.innerHeight)
+          // donde las letras están centradas y el logo frontal.
+          targetY = sectionTop + window.innerHeight;
+        } else if (sectionHeight <= viewportHeight) {
           // Si cabe en el viewport, centrarla verticalmente
           targetY = sectionTop + sectionHeight / 2 - viewportHeight / 2;
         } else {
