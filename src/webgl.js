@@ -1283,14 +1283,20 @@ export class SimbiotikWebGL {
       const rotY = (scrollY / Math.max(1, centerScroll)) * Math.PI;
       const goldFactor = (1.0 - Math.cos(rotY)) / 2.0;
 
-      // Lerp suave de rotación X para acostar el logo 3D únicamente en Memoria Natural
-      const targetRotX = (this.activeSection === 'memoria-intro') ? (Math.PI / 2.2) : 0;
+      // Lerp suave de rotación X y Z para imitar la inclinación de los anillos de Saturno únicamente en Memoria Natural
+      const isMemoria = (this.activeSection === 'memoria-intro');
+      const targetRotX = isMemoria ? (Math.PI / 2.6) : 0;  // Inclinación frontal (~69 deg)
+      const targetRotZ = isMemoria ? (-Math.PI / 10) : 0; // Inclinación diagonal de Saturno (~-18 deg)
+
       if (this.currentLogoRotX === undefined) this.currentLogoRotX = 0;
+      if (this.currentLogoRotZ === undefined) this.currentLogoRotZ = 0;
+
       this.currentLogoRotX += (targetRotX - this.currentLogoRotX) * 0.05;
+      this.currentLogoRotZ += (targetRotZ - this.currentLogoRotZ) * 0.05;
 
       this.logoGroup.rotation.y = rotY;
       this.logoGroup.rotation.x = this.currentLogoRotX;
-      this.logoGroup.rotation.z = 0;
+      this.logoGroup.rotation.z = this.currentLogoRotZ;
       this.logoGroup.scale.set(1.0, 1.0, 1.0);
 
       // Animar el texto de la sección Simbiosis: entra por la izquierda, se centra perfecto y sale rápidamente por la derecha
