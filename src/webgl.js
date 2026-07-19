@@ -37,7 +37,7 @@ const vertexShader = `
   }
 `;
 
-// Vertex Shader para las 5,000 partículas en columna espiral (Giro orbital limpio sin pulsaciones radiales)
+// Vertex Shader para las 5,000 partículas en columna espiral que caen desde la parte superior
 const spiralVertexShader = `
   uniform float uTime;
   uniform vec2 uMouse;
@@ -45,49 +45,57 @@ const spiralVertexShader = `
   attribute float aIndex;
   attribute float aSizeScale;
   attribute float aColorFactor;
-  attribute vec3 aRandomOffset; // x = velocidad vertical, y = velocidad angular, z = amplitud
+  attribute vec3 aRandomOffset; // x = velocidad vertical, y = velocidad angular, z = amplitud de deriva
   varying vec3 vColor;
   varying float vOpacity;
 
   void main() {
-    // Ciclo de vida progresivo y suave
+    // Ciclo de vida muy lento y personalizado
     float lifetime = mod(uTime * 0.05 * aRandomOffset.x + aIndex * 0.0002, 1.0);
     
-    // Cae suavemente desde la parte superior del hero (Y = 4.5) hacia abajo (Y = -4.5)
-    float y = 4.5 - lifetime * 9.0;
+    // Cae lentamente desde la parte superior del hero (Y = 4.5) hacia abajo (Y = -4.5)
+    // Se añade una pequeña fluctuación senoidal para simular resistencia al caer (aleatorio/orgánico)
+    float y = 4.5 - (lifetime + sin(lifetime * 3.1415) * 0.05) * 9.0;
     
-    // Rotación orbital constante alrededor del eje central del logo 3D
+    // Espiral con rotación lenta y velocidad angular única por partícula
     float angle = aIndex * 0.05 + y * 1.8 + uTime * (0.08 * aRandomOffset.y);
     
-    // Radio de órbita concéntrico estable
+    // Radio de la espiral ensanchándose suavemente al descender
     float radius = 0.15 + lifetime * 0.45;
     
+    // Deriva horizontal lenta y aleatoria (efecto de polvo flotante/copos de nieve)
+    float driftX = sin(uTime * (0.35 * aRandomOffset.x) + aIndex) * aRandomOffset.z * 1.8;
+    float driftZ = cos(uTime * (0.3 * aRandomOffset.y) + aIndex * 1.3) * aRandomOffset.z * 1.8;
+    
     vec3 pos = vec3(
-      cos(angle) * radius,
+      cos(angle) * radius + driftX,
       y,
-      sin(angle) * radius
+      sin(angle) * radius + driftZ
     );
     
-    // Interacción elástica limpia con el cursor
+    // Interacción elástica con el cursor al pasar sobre ellas
     vec2 mouseCoords = uMouse * 3.5;
     float distToMouse = distance(pos.xy, mouseCoords);
     if (distToMouse < 1.6) {
-      float force = (1.6 - distToMouse) * 0.35;
+      float force = (1.6 - distToMouse) * 0.45;
       vec2 pushDir = normalize(pos.xy - mouseCoords + vec2(0.001));
-      pos.xy += pushDir * force * 0.5;
+      pos.xy += pushDir * force * 0.7;
+      pos.z += sin(uTime * 3.0 + distToMouse * 6.0) * force * 0.5;
     }
     
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
     
-    // Tamaño de partícula continuo
+    // Tamaño de partícula aleatorio y variable (aspecto de la imagen) - se agranda en la nueva sección
     gl_PointSize = (aSizeScale * 25.0 / -mvPosition.z) * (1.0 + uNewSectionProgress * 0.6);
     
     // Mezcla de colores Verde Aqua y Morado Neon
-    vec3 colorAqua = vec3(0.0, 0.96, 0.83);
-    vec3 colorPurple = vec3(0.85, 0.27, 0.93);
+    vec3 colorAqua = vec3(0.0, 0.96, 0.83); // Verde Aqua
+    vec3 colorPurple = vec3(0.85, 0.27, 0.93); // Morado Neon
     vColor = mix(colorAqua, colorPurple, aColorFactor);
-    vOpacity = (0.4 + 0.6 * sin(uTime * 0.5 + aIndex)) * (1.0 - uNewSectionProgress * 0.5);
+    
+    // Opacidad de burbuja translúcida que se desvanece en los extremos
+    vOpacity = sin(lifetime * 3.14159) * (0.15 + aSizeScale * 0.35);
   }
 `;
 
