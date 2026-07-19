@@ -1080,8 +1080,8 @@ export class SimbiotikWebGL {
         this.logoSpinSpeed = 0.005;
         break;
       case 'memoria-intro':
-        // Logo 3D centrado en el fondo y acostado (horizontal)
-        targetCamZ = 5.0;
+        // Logo 3D centrado en el fondo y alejado 30 unidades sobre Z (targetCamZ = 35.0)
+        targetCamZ = 35.0;
         targetCamX = 0.0;
         targetCamY = 0.0;
         this.logoSpinSpeed = 0.002;
