@@ -1269,30 +1269,43 @@ export class SimbiotikWebGL {
     }
 
     // Rotar logotipo interactivo en base al scroll vertical (ajustado para dar exactamente la media vuelta en la sección Simbiosis)
+    // Rotar logotipo interactivo en base al scroll vertical
     if (this.logoGroup) {
       const scrollY = window.scrollY || document.documentElement.scrollTop;
+      const viewHeight = window.innerHeight;
       
-      // La media vuelta (PI rad) se completa en el punto medio de la sección Simbiosis (scrollY = 2 * viewport height)
-      const targetScroll = 2.0 * window.innerHeight;
-      this.logoGroup.rotation.y = scrollY * (Math.PI / targetScroll);
-      
+      const simbiosisSec = document.getElementById('simbiosis-sonido');
+      let centerScroll = 2.0 * viewHeight;
+      if (simbiosisSec) {
+        const secRect = simbiosisSec.getBoundingClientRect();
+        centerScroll = scrollY + secRect.top + viewHeight;
+      }
+
+      this.logoGroup.rotation.y = (scrollY / Math.max(1, centerScroll)) * Math.PI;
       this.logoGroup.rotation.x = 0;
       this.logoGroup.rotation.z = 0;
-      
-      // Logotipo estático en escala (sin vibración/pulsación de audio)
       this.logoGroup.scale.set(1.0, 1.0, 1.0);
 
-      // Calcular el factor de oro basado en el ángulo de rotación Y
-      // (el coseno hace que el cambio sea suave: 0 en el frente, 1 al dar medio giro de 180 deg)
       const angle = this.logoGroup.rotation.y;
       const goldFactor = (1.0 - Math.cos(angle)) / 2.0;
 
-      // Hacer aparecer la frase "Donde la simbiosis humana se convierte en sonido"
-      // controlando su opacidad y elevación mediante el factor de oro en CSS
+      // Animar el texto de la sección Simbiosis: entra por la izquierda, se centra perfecto y sale por la derecha
       const simbiosisTitle = document.querySelector('.simbiosis-title');
       if (simbiosisTitle) {
-        simbiosisTitle.style.opacity = Math.pow(goldFactor, 1.2); // Entrada más rápida y opaca
-        simbiosisTitle.style.setProperty('--gold-factor', goldFactor);
+        // Desfase normalizado respecto al centro magnético exacto (-1 al inicio, 0 al centro, +1 al final)
+        const offset = (scrollY - centerScroll) / viewHeight;
+        
+        // Desplazamiento horizontal en % del ancho de pantalla (vw):
+        // offset -1 -> -60vw (fuera por la izquierda)
+        // offset  0 ->   0vw (perfectamente centrado en la pantalla)
+        // offset +1 -> +60vw (fuera por la derecha)
+        const shiftX = offset * 60;
+        
+        // Opacidad: Máxima (1.0) en el centro magnético, se desvanece suavemente hacia los extremos
+        const opacity = Math.max(0, 1.0 - Math.pow(Math.abs(offset), 1.2));
+
+        simbiosisTitle.style.transform = `translateX(${shiftX}vw)`;
+        simbiosisTitle.style.opacity = opacity;
       }
 
       // Actualizar propiedades físicas del material para fundir a metal cromo brillante
