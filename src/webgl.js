@@ -1302,8 +1302,8 @@ export class SimbiotikWebGL {
       const targetRotYOffset = isMemoria ? ((100 * Math.PI) / 180) : 0; // 100 grados en Y
       const targetRotZ = isMemoria ? (-Math.PI / 10) : 0;              // Inclinación diagonal previa (-18 deg)
 
-      // Escalar la profundidad Z a la mitad (0.5) únicamente en la sección Memoria Natural
-      const targetScaleZ = isMemoria ? 0.5 : 1.0;
+      // Escalar la profundidad Z al 25% (0.25) únicamente en la sección Memoria Natural
+      const targetScaleZ = isMemoria ? 0.25 : 1.0;
 
       if (this.currentLogoRotX === undefined) this.currentLogoRotX = 0;
       if (this.currentLogoRotYOffset === undefined) this.currentLogoRotYOffset = 0;
