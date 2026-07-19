@@ -1264,32 +1264,21 @@ export class SimbiotikWebGL {
     }
 
     // Rotar logotipo interactivo en base al scroll vertical (ajustado para dar exactamente la media vuelta en la sección Simbiosis)
-    // Rotar logotipo interactivo únicamente al ingresar a la sección Simbiosis
+    // Rotar logotipo interactivo en base al scroll vertical desde el primer momento
     if (this.logoGroup) {
       const scrollY = window.scrollY || document.documentElement.scrollTop;
       const viewHeight = window.innerHeight;
       
       const simbiosisSec = document.getElementById('simbiosis-sonido');
       let centerScroll = 2.0 * viewHeight;
-      let rotY = 0;
-      let goldFactor = 0;
-
       if (simbiosisSec) {
         const secRect = simbiosisSec.getBoundingClientRect();
-        const secTop = scrollY + secRect.top;
-        centerScroll = secTop + viewHeight;
-
-        // La rotación e interpolación de material ocurre ÚNICAMENTE dentro de la sección Simbiosis
-        if (scrollY >= secTop) {
-          const progress = Math.min(1.0, Math.max(0.0, (scrollY - secTop) / viewHeight));
-          rotY = progress * Math.PI;
-          goldFactor = (1.0 - Math.cos(rotY)) / 2.0;
-        } else {
-          // En el Hero (sección inicio), el logo 3D permanece 100% estático y sólido
-          rotY = 0;
-          goldFactor = 0;
-        }
+        centerScroll = scrollY + secRect.top + viewHeight;
       }
+
+      // El giro del logo inicia de forma fluida desde el primer píxel de scroll
+      const rotY = (scrollY / Math.max(1, centerScroll)) * Math.PI;
+      const goldFactor = (1.0 - Math.cos(rotY)) / 2.0;
 
       this.logoGroup.rotation.y = rotY;
       this.logoGroup.rotation.x = 0;
