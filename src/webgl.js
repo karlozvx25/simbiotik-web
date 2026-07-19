@@ -1295,18 +1295,23 @@ export class SimbiotikWebGL {
       const targetRotYOffset = isMemoria ? ((110 * Math.PI) / 180) : 0; // 110 grados en Y
       const targetRotZ = isMemoria ? (-Math.PI / 10) : 0;              // Inclinación diagonal previa (-18 deg)
 
+      // Escalar la profundidad Z a la mitad (0.5) únicamente en la sección Memoria Natural
+      const targetScaleZ = isMemoria ? 0.5 : 1.0;
+
       if (this.currentLogoRotX === undefined) this.currentLogoRotX = 0;
       if (this.currentLogoRotYOffset === undefined) this.currentLogoRotYOffset = 0;
       if (this.currentLogoRotZ === undefined) this.currentLogoRotZ = 0;
+      if (this.currentLogoScaleZ === undefined) this.currentLogoScaleZ = 1.0;
 
       this.currentLogoRotX += (targetRotX - this.currentLogoRotX) * 0.05;
       this.currentLogoRotYOffset += (targetRotYOffset - this.currentLogoRotYOffset) * 0.05;
       this.currentLogoRotZ += (targetRotZ - this.currentLogoRotZ) * 0.05;
+      this.currentLogoScaleZ += (targetScaleZ - this.currentLogoScaleZ) * 0.05;
 
       this.logoGroup.rotation.y = baseRotY + this.currentLogoRotYOffset;
       this.logoGroup.rotation.x = this.currentLogoRotX;
       this.logoGroup.rotation.z = this.currentLogoRotZ;
-      this.logoGroup.scale.set(1.0, 1.0, 1.0);
+      this.logoGroup.scale.set(1.0, 1.0, this.currentLogoScaleZ);
 
       // Animar el texto de la sección Simbiosis: entra por la izquierda, se centra perfecto y sale rápidamente por la derecha
       const simbiosisTitle = document.querySelector('.simbiosis-title');
