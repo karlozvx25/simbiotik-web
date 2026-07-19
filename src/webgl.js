@@ -185,6 +185,8 @@ export class SimbiotikWebGL {
     this.logoVertices = null;
     this.logoParticles = null;
     this.logoParticleMode = false;
+    this.activeSection = 'inicio';
+    this.currentLogoRotX = 0;
 
     this.initParticles();
     this.initSpiralParticles();
@@ -1051,6 +1053,7 @@ export class SimbiotikWebGL {
 
   // Manejar el cambio de posición de la cámara según la sección activa (Efecto Cinematic Scroll)
   triggerSectionTransition(sectionId) {
+    this.activeSection = sectionId;
     let targetCamZ = 6;
     let targetCamY = 0;
     let targetCamX = 0;
@@ -1077,10 +1080,10 @@ export class SimbiotikWebGL {
         this.logoSpinSpeed = 0.005;
         break;
       case 'memoria-intro':
-        // Acercar la cámara a la derecha, dejando el logo cargado a la izquierda
-        targetCamZ = 4.5;
-        targetCamX = -1.2;
-        targetCamY = 0.2;
+        // Logo 3D centrado en el fondo y acostado (horizontal)
+        targetCamZ = 5.0;
+        targetCamX = 0.0;
+        targetCamY = 0.0;
         this.logoSpinSpeed = 0.002;
         break;
       case 'simbolo':
@@ -1280,8 +1283,13 @@ export class SimbiotikWebGL {
       const rotY = (scrollY / Math.max(1, centerScroll)) * Math.PI;
       const goldFactor = (1.0 - Math.cos(rotY)) / 2.0;
 
+      // Lerp suave de rotación X para acostar el logo 3D únicamente en Memoria Natural
+      const targetRotX = (this.activeSection === 'memoria-intro') ? (Math.PI / 2.2) : 0;
+      if (this.currentLogoRotX === undefined) this.currentLogoRotX = 0;
+      this.currentLogoRotX += (targetRotX - this.currentLogoRotX) * 0.05;
+
       this.logoGroup.rotation.y = rotY;
-      this.logoGroup.rotation.x = 0;
+      this.logoGroup.rotation.x = this.currentLogoRotX;
       this.logoGroup.rotation.z = 0;
       this.logoGroup.scale.set(1.0, 1.0, 1.0);
 
