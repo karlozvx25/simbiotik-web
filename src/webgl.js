@@ -1289,20 +1289,24 @@ export class SimbiotikWebGL {
       const angle = this.logoGroup.rotation.y;
       const goldFactor = (1.0 - Math.cos(angle)) / 2.0;
 
-      // Animar el texto de la sección Simbiosis: entra por la izquierda, se centra perfecto y sale por la derecha
+      // Animar el texto de la sección Simbiosis: entra por la izquierda, se centra perfecto y sale rápidamente por la derecha
       const simbiosisTitle = document.querySelector('.simbiosis-title');
       if (simbiosisTitle) {
         // Desfase normalizado respecto al centro magnético exacto (-1 al inicio, 0 al centro, +1 al final)
         const offset = (scrollY - centerScroll) / viewHeight;
         
-        // Desplazamiento horizontal en % del ancho de pantalla (vw):
-        // offset -1 -> -60vw (fuera por la izquierda)
-        // offset  0 ->   0vw (perfectamente centrado en la pantalla)
-        // offset +1 -> +60vw (fuera por la derecha)
-        const shiftX = offset * 60;
-        
-        // Opacidad: Máxima (1.0) en el centro magnético, se desvanece suavemente hacia los extremos
-        const opacity = Math.max(0, 1.0 - Math.pow(Math.abs(offset), 1.2));
+        let shiftX = 0;
+        let opacity = 0;
+
+        if (offset <= 0) {
+          // Entrada desde la izquierda hacia el centro magnético (-60vw a 0vw)
+          shiftX = offset * 60;
+          opacity = Math.max(0, 1.0 - Math.pow(Math.abs(offset), 1.2));
+        } else {
+          // Salida acelerada hacia la derecha para desaparecer totalmente antes de Memoria Natural
+          shiftX = offset * 130; // Movimiento más rápido a la derecha
+          opacity = Math.max(0, 1.0 - offset * 2.5); // Desaparece a 0 opacidad en offset ~0.4
+        }
 
         simbiosisTitle.style.transform = `translateX(${shiftX}vw)`;
         simbiosisTitle.style.opacity = opacity;
