@@ -555,12 +555,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (snapTimeout) clearTimeout(snapTimeout);
 
-    // Si el usuario está scrolleando activamente o navegando, cancelar la cola
+    // Cancelar si el sistema ya está realizando un snap o navegación programada
     if (isSnapping || isNavigating) return;
 
-    // Activar el snap magnético automáticamente al ralentizarse o soltar el scroll
-    if (Math.abs(e.velocity) < 1.2) {
-      snapTimeout = setTimeout(performSnap, 150);
+    // Activar inmediatamente el encuadre magnético al ralentizarse o soltar el scroll
+    if (Math.abs(e.velocity) < 0.6) {
+      snapTimeout = setTimeout(performSnap, 100);
     }
   });
 });
