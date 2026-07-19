@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import gsap from 'gsap';
 
 
-// Vertex Shader para las partículas de fondo (Restaurado al original)
+// Vertex Shader para las partículas de fondo (Movimiento únicamente orbital alrededor del logo 3D)
 const vertexShader = `
   uniform float uTime;
   uniform float uAudioFreq;
@@ -18,31 +18,26 @@ const vertexShader = `
   void main() {
     vec3 pos = position;
     
-    // Ruido sinusoidal e impulso del audio
-    float wave = sin(pos.x * 1.5 + uTime * 1.2) * cos(pos.y * 1.5 + uTime * 1.2) * 0.3;
-    pos.z += wave * (1.0 + uAudioFreq * 6.0);
-    
-    // Interacción con la posición normalizada del mouse
+    // Interacción suave de deformación sólo al acercarse el cursor
     float distToMouse = distance(pos.xy, uMouse * 3.5);
-    if (distToMouse < 2.2) {
-      float force = (2.2 - distToMouse) * 0.45;
-      pos.z += force * sin(uTime * 6.0);
-      pos.x += force * uMouse.x * 0.2;
-      pos.y += force * uMouse.y * 0.2;
+    if (distToMouse < 1.8) {
+      float force = (1.8 - distToMouse) * 0.25;
+      pos.x += force * uMouse.x * 0.15;
+      pos.y += force * uMouse.y * 0.15;
     }
     
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
     
-    // Modulación del tamaño según la cercanía y la frecuencia del bajo musical
-    gl_PointSize = (14.0 / -mvPosition.z) * (1.0 + uAudioFreq * 0.9);
+    // Tamaño de partícula estable según la profundidad de campo
+    gl_PointSize = (14.0 / -mvPosition.z);
     
     vColor = color;
     vOpacity = (0.3 + 0.7 * sin(uTime * aRandoms.x + aRandoms.y)) * (1.0 - uNewSectionProgress);
   }
 `;
 
-// Vertex Shader para las 5,000 partículas en columna espiral que caen desde la parte superior
+// Vertex Shader para las 5,000 partículas en columna espiral (Giro orbital limpio sin pulsaciones radiales)
 const spiralVertexShader = `
   uniform float uTime;
   uniform vec2 uMouse;
@@ -50,57 +45,49 @@ const spiralVertexShader = `
   attribute float aIndex;
   attribute float aSizeScale;
   attribute float aColorFactor;
-  attribute vec3 aRandomOffset; // x = velocidad vertical, y = velocidad angular, z = amplitud de deriva
+  attribute vec3 aRandomOffset; // x = velocidad vertical, y = velocidad angular, z = amplitud
   varying vec3 vColor;
   varying float vOpacity;
 
   void main() {
-    // Ciclo de vida muy lento y personalizado
+    // Ciclo de vida progresivo y suave
     float lifetime = mod(uTime * 0.05 * aRandomOffset.x + aIndex * 0.0002, 1.0);
     
-    // Cae lentamente desde la parte superior del hero (Y = 4.5) hacia abajo (Y = -4.5)
-    // Se añade una pequeña fluctuación senoidal para simular resistencia al caer (aleatorio/orgánico)
-    float y = 4.5 - (lifetime + sin(lifetime * 3.1415) * 0.05) * 9.0;
+    // Cae suavemente desde la parte superior del hero (Y = 4.5) hacia abajo (Y = -4.5)
+    float y = 4.5 - lifetime * 9.0;
     
-    // Espiral con rotación lenta y velocidad angular única por partícula
+    // Rotación orbital constante alrededor del eje central del logo 3D
     float angle = aIndex * 0.05 + y * 1.8 + uTime * (0.08 * aRandomOffset.y);
     
-    // Radio de la espiral ensanchándose suavemente al descender
+    // Radio de órbita concéntrico estable
     float radius = 0.15 + lifetime * 0.45;
     
-    // Deriva horizontal lenta y aleatoria (efecto de polvo flotante/copos de nieve)
-    float driftX = sin(uTime * (0.35 * aRandomOffset.x) + aIndex) * aRandomOffset.z * 1.8;
-    float driftZ = cos(uTime * (0.3 * aRandomOffset.y) + aIndex * 1.3) * aRandomOffset.z * 1.8;
-    
     vec3 pos = vec3(
-      cos(angle) * radius + driftX,
+      cos(angle) * radius,
       y,
-      sin(angle) * radius + driftZ
+      sin(angle) * radius
     );
     
-    // Interacción elástica con el cursor al pasar sobre ellas
+    // Interacción elástica limpia con el cursor
     vec2 mouseCoords = uMouse * 3.5;
     float distToMouse = distance(pos.xy, mouseCoords);
     if (distToMouse < 1.6) {
-      float force = (1.6 - distToMouse) * 0.45;
+      float force = (1.6 - distToMouse) * 0.35;
       vec2 pushDir = normalize(pos.xy - mouseCoords + vec2(0.001));
-      pos.xy += pushDir * force * 0.7;
-      pos.z += sin(uTime * 3.0 + distToMouse * 6.0) * force * 0.5;
+      pos.xy += pushDir * force * 0.5;
     }
     
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
     
-    // Tamaño de partícula aleatorio y variable (aspecto de la imagen) - se agranda en la nueva sección
+    // Tamaño de partícula continuo
     gl_PointSize = (aSizeScale * 25.0 / -mvPosition.z) * (1.0 + uNewSectionProgress * 0.6);
     
     // Mezcla de colores Verde Aqua y Morado Neon
-    vec3 colorAqua = vec3(0.0, 0.96, 0.83); // Verde Aqua
-    vec3 colorPurple = vec3(0.85, 0.27, 0.93); // Morado Neon
+    vec3 colorAqua = vec3(0.0, 0.96, 0.83);
+    vec3 colorPurple = vec3(0.85, 0.27, 0.93);
     vColor = mix(colorAqua, colorPurple, aColorFactor);
-    
-    // Opacidad de burbuja translúcida que se desvanece en los extremos
-    vOpacity = sin(lifetime * 3.14159) * (0.15 + aSizeScale * 0.35);
+    vOpacity = (0.4 + 0.6 * sin(uTime * 0.5 + aIndex)) * (1.0 - uNewSectionProgress * 0.5);
   }
 `;
 
