@@ -40,7 +40,7 @@ export class TextScramble {
           char = this.randomChar();
           this.queue[i].char = char;
         }
-        output += `<span class="glitch-char">${char}</span>`;
+        output += `<span class="glitch-char" style="font-family: monospace !important; font-style: normal !important; display: inline-block;">${char}</span>`;
       } else {
         output += from;
       }

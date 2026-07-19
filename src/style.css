@@ -1096,11 +1096,18 @@ body::-webkit-scrollbar {
   text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
 }
 
-/* Glitch char styling */
-.glitch-char {
+/* Glitch char styling - Forzar tipografía monospace pura para evitar marcas de agua de fuentes demo */
+.glitch-char,
+.scramble-text .glitch-char,
+.hero-title .glitch-char,
+h1 .glitch-char,
+h2 .glitch-char,
+a .glitch-char {
   color: var(--color-electric);
-  font-family: monospace;
-  opacity: 0.7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-style: normal !important;
+  font-weight: normal !important;
+  opacity: 0.85;
 }
 
 /* RESPONSIVE DESIGN */
