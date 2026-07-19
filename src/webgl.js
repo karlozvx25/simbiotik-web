@@ -1283,10 +1283,10 @@ export class SimbiotikWebGL {
       const rotY = (scrollY / Math.max(1, centerScroll)) * Math.PI;
       const goldFactor = (1.0 - Math.cos(rotY)) / 2.0;
 
-      // Lerp suave de rotación X y Z para imitar la inclinación de los anillos de Saturno únicamente en Memoria Natural
+      // Lerp suave de rotación X y Z para la sección Memoria Natural (90 grados en Z)
       const isMemoria = (this.activeSection === 'memoria-intro');
       const targetRotX = isMemoria ? (Math.PI / 2.6) : 0;  // Inclinación frontal (~69 deg)
-      const targetRotZ = isMemoria ? (-Math.PI / 10) : 0; // Inclinación diagonal de Saturno (~-18 deg)
+      const targetRotZ = isMemoria ? ((90 * Math.PI) / 180) : 0; // 90 grados en Z
 
       if (this.currentLogoRotX === undefined) this.currentLogoRotX = 0;
       if (this.currentLogoRotZ === undefined) this.currentLogoRotZ = 0;
