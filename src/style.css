@@ -842,6 +842,13 @@ body::-webkit-scrollbar {
   padding-top: 50px;
 }
 
+#memoria-intro .container {
+  position: relative;
+  z-index: 20;
+  pointer-events: auto;
+  transform: translateY(-200px);
+}
+
 #simbolo.section-pane {
   padding-top: 50px;
 }

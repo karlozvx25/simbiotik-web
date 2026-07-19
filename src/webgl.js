@@ -1286,8 +1286,8 @@ export class SimbiotikWebGL {
       this.hideBlackHole();
     }
 
-    // Terreno wireframe 3D únicamente en la sección Memoria Natural (memoria-natural)
-    if (sectionId === 'memoria-natural') {
+    // Terreno wireframe 3D activo desde Agujero Negro (memoria-intro) y continuando en Memoria Natural (memoria-natural)
+    if (sectionId === 'memoria-intro' || sectionId === 'memoria-natural') {
       this.showWaterWaves();
     } else {
       this.hideWaterWaves();

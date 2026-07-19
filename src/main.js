@@ -430,6 +430,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mover cámara WebGL según la sección activa en el scroll
         webgl.triggerSectionTransition(sectionId);
         
+        // Ocultar retícula técnica (.tech-grid) únicamente en la sección Agujero Negro (memoria-intro)
+        const techGrid = document.querySelector('.tech-grid');
+        if (techGrid) {
+          if (sectionId === 'memoria-intro') {
+            techGrid.style.transition = 'opacity 0.6s ease';
+            techGrid.style.opacity = '0';
+          } else {
+            techGrid.style.transition = 'opacity 0.6s ease';
+            techGrid.style.opacity = '1';
+          }
+        }
+
         // Actualizar menú activo en el menú lateral del hero
         document.querySelectorAll('.hero-sidebar-links a').forEach(l => {
           l.classList.remove('active');
