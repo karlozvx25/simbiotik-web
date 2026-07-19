@@ -152,6 +152,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // Memoria Natural: Centro magnético fijado exactamente en el punto donde desaparece por completo el agujero negro
+    if (section.id === 'memoria-natural') {
+      return sectionTop + sectionHeight / 2 - viewportHeight / 2;
+    }
+
     // Offsets específicos para encuadre ideal
     const sectionOffsets = {
       'memoria-intro': -20,
@@ -427,6 +432,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sectionId === lastActiveSection) return;
         lastActiveSection = sectionId;
         
+        // Actualizar clase de sección activa en document.body para controlar z-index CSS
+        document.body.className = document.body.className.replace(/\bsection-[\w-]+\b/g, '').trim();
+        document.body.classList.add(`section-${sectionId}`);
+
         // Mover cámara WebGL según la sección activa en el scroll
         webgl.triggerSectionTransition(sectionId);
         
@@ -461,12 +470,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sectionId === 'simbolo') {
           // Mostrar SVG overlay y ocultar logo 3D con un ligero retraso
           setTimeout(() => {
-            svgOverlay.classList.add('visible');
+            if (svgOverlay) svgOverlay.classList.add('visible');
             webgl.setLogoVisibility(false);
           }, 600);
         } else {
           // Ocultar SVG overlay y restaurar logo 3D
-          svgOverlay.classList.remove('visible');
+          if (svgOverlay) svgOverlay.classList.remove('visible');
           webgl.setLogoVisibility(true);
         }
       }
