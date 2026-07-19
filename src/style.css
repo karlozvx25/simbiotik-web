@@ -76,8 +76,8 @@ body::-webkit-scrollbar {
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 0;
-  pointer-events: auto;
+  z-index: 2;
+  pointer-events: none;
 }
 
 /* Capas decorativas de cuadrícula técnica y scanlines */
@@ -298,8 +298,8 @@ body::-webkit-scrollbar {
 .content-container {
   position: relative;
   width: 100%;
-  z-index: 10;
-  pointer-events: auto;
+  z-index: auto;
+  pointer-events: none;
 }
 
 .section-pane {
@@ -319,6 +319,157 @@ body::-webkit-scrollbar {
 .section-pane.visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.section-black {
+  background: #000000 !important;
+}
+
+.section-white {
+  background: transparent !important;
+  color: #0f172a;
+  position: relative;
+}
+
+.section-white::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.section-white .container {
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
+}
+
+.section-white .tech-subtitle {
+  color: #0284c7;
+}
+
+.section-white .section-title {
+  color: #0f172a;
+  text-shadow: 0 0 20px rgba(2, 132, 199, 0.15);
+}
+
+.section-white .section-desc {
+  color: #334155;
+}
+
+.section-white .glass-panel {
+  background: rgba(248, 250, 252, 0.88);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.section-white .glass-panel:hover {
+  border-color: rgba(2, 132, 199, 0.4);
+  box-shadow: 0 20px 45px rgba(2, 132, 199, 0.12);
+}
+
+.section-white .track-act-label {
+  color: #0284c7;
+}
+
+.section-white .track-act-title {
+  color: #64748b;
+}
+
+.section-white .track-divider {
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.section-white .track-title {
+  color: #0f172a;
+}
+
+.section-white .meta-tag {
+  color: #475569;
+}
+
+.section-white .meta-separator {
+  color: #94a3b8;
+}
+
+.section-white .track-quote {
+  color: #334155;
+  border-left-color: #0284c7;
+}
+
+.section-white .act-number {
+  color: #0284c7;
+}
+
+.section-white .act-name {
+  color: #0f172a;
+}
+
+.section-white .act-message {
+  color: #64748b;
+}
+
+.section-white .act-header {
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+.section-white .track-row {
+  border-bottom-color: rgba(15, 23, 42, 0.06);
+}
+
+.section-white .track-row:hover {
+  background: rgba(2, 132, 199, 0.06);
+}
+
+.section-white .track-row.active {
+  background: rgba(2, 132, 199, 0.12);
+  border: 1px solid rgba(2, 132, 199, 0.3);
+}
+
+.section-white .track-row-num {
+  color: #64748b;
+}
+
+.section-white .track-row.active .track-row-num {
+  color: #0284c7;
+}
+
+.section-white .track-row-title {
+  color: #0f172a;
+}
+
+.section-white .btn-ctrl {
+  border-color: rgba(15, 23, 42, 0.2);
+  color: #1e293b;
+}
+
+.section-white .btn-ctrl:hover {
+  border-color: #0284c7;
+  color: #0284c7;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.2);
+}
+
+.section-white .btn-play {
+  background: rgba(2, 132, 199, 0.12);
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
+.section-white .btn-play:hover {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.section-white .time-label {
+  color: #64748b;
+}
+
+.section-white .progress-bar-bg {
+  background: rgba(15, 23, 42, 0.1);
 }
 
 .container {

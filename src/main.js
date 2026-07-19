@@ -400,6 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'inicio': { state: 'idle', color: '#38bdf8' },
     'simbiosis-sonido': { state: 'idle', color: '#38bdf8' },
     'memoria-intro': { state: 'active', color: '#7f1d1d' },
+    'memoria-natural': { state: 'active', color: '#0284c7' },
     'simbolo': { state: 'core', color: '#6d28d9' },
     'manifiesto': { state: 'memory', color: '#b88945' },
     'press-kit': { state: 'memory', color: '#b88945' },

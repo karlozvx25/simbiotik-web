@@ -1051,6 +1051,219 @@ export class SimbiotikWebGL {
     });
   }
 
+  // Inicialización del Agujero Negro 3D (Singularidad al 20% del diámetro del logotipo 3D)
+  initBlackHole() {
+    this.blackHoleGroup = new THREE.Group();
+
+    // Diámetro del logotipo 3D = 2.8 unidades -> 20% del diámetro = 0.56 unidades (Radio = 0.28)
+    const coreRadius = 0.28;
+    const outerRadius = 0.65;
+
+    // 1. Núcleo Oscuro (Horizonte de Sucesos)
+    const coreGeo = new THREE.SphereGeometry(coreRadius, 64, 64);
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      side: THREE.FrontSide
+    });
+    this.blackHoleCore = new THREE.Mesh(coreGeo, coreMat);
+    this.blackHoleGroup.add(this.blackHoleCore);
+
+    // 2. Anillo de Acreción Carmesí / Singularidad
+    const glowGeo = new THREE.RingGeometry(coreRadius, outerRadius, 64);
+    const glowMat = new THREE.ShaderMaterial({
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uOpacity: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying float vRadius;
+        void main() {
+          vUv = uv;
+          vRadius = length(position.xy);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uOpacity;
+        varying vec2 vUv;
+        varying float vRadius;
+
+        void main() {
+          float dist = (vRadius - 0.28) / 0.37;
+          vec3 innerGlow = vec3(0.95, 0.12, 0.05); // Carmesí brillante
+          vec3 outerGlow = vec3(0.40, 0.02, 0.01); // Carmesí profundo
+
+          vec3 color = mix(innerGlow, outerGlow, dist);
+          float ringPattern = sin(dist * 20.0 - uTime * 3.0) * 0.15 + 0.85;
+          float alpha = uOpacity * smoothstep(0.0, 0.08, dist) * smoothstep(1.0, 0.2, dist) * ringPattern;
+
+          gl_FragColor = vec4(color, alpha * 0.92);
+        }
+      `
+    });
+
+    this.blackHoleGlow = new THREE.Mesh(glowGeo, glowMat);
+    this.blackHoleGlow.rotation.x = Math.PI / 2.5; // Inclinación estilizada
+    this.blackHoleGroup.add(this.blackHoleGlow);
+
+    // Centrado exactamente con el logo 3D en el fondo
+    this.blackHoleGroup.position.set(0, 0, -0.2);
+    this.blackHoleGroup.visible = false;
+    this.scene.add(this.blackHoleGroup);
+  }
+
+  showBlackHole() {
+    if (!this.blackHoleGroup) {
+      this.initBlackHole();
+    }
+    if (this.blackHoleGroup) {
+      this.blackHoleGroup.visible = true;
+      if (this.blackHoleGlow && this.blackHoleGlow.material.uniforms) {
+        gsap.to(this.blackHoleGlow.material.uniforms.uOpacity, {
+          value: 1, duration: 1.2, ease: 'power2.inOut'
+        });
+      }
+    }
+  }
+
+  hideBlackHole() {
+    if (!this.blackHoleGroup) return;
+    if (this.blackHoleGlow && this.blackHoleGlow.material.uniforms) {
+      gsap.to(this.blackHoleGlow.material.uniforms.uOpacity, {
+        value: 0, duration: 0.8, ease: 'power2.inOut',
+        onComplete: () => { this.blackHoleGroup.visible = false; }
+      });
+    }
+  }
+
+  initWaterWaves() {
+    // Malla 3D wireframe de alta densidad (vista dron estilo paisaje digital)
+    const geo = new THREE.PlaneGeometry(60, 45, 140, 140);
+
+    const mat = new THREE.ShaderMaterial({
+      wireframe: true,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uMouse: this.uniforms.uMouse,
+        uOpacity: { value: 0 }
+      },
+      vertexShader: `
+        uniform float uTime;
+        uniform vec2 uMouse;
+        uniform float uOpacity;
+        varying float vElevation;
+        varying float vDepth;
+        varying vec2 vUv;
+
+        // Función matemática continua que genera relieve de montañas y valles
+        float getElevation(vec2 p, float t) {
+          // Desplazamiento continuo en Y simulando el vuelo infinito hacia al frente (bucle sin cortes)
+          vec2 pos = vec2(p.x * 0.2, (p.y + t * 2.2) * 0.2);
+          
+          float h = 0.0;
+          h += sin(pos.x * 0.8 + pos.y * 1.0) * 1.5;
+          h += cos(pos.x * 0.5 - pos.y * 1.3) * 1.2;
+          h += sin((pos.x + pos.y) * 1.8) * 0.6;
+          h += cos(pos.x * 2.5 - pos.y * 2.0) * 0.35;
+          h += sin(pos.x * 4.5 + pos.y * 4.0) * 0.15;
+          return h;
+        }
+
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+
+          // Calcular elevación del terreno
+          float elevation = getElevation(pos.xy, uTime);
+
+          // Interacción con el cursor: deformación y ondas dinámicas cerca del mouse
+          vec2 mouseTarget = uMouse * vec2(15.0, 10.0);
+          float distToMouse = distance(pos.xy, mouseTarget);
+          float mouseRadius = 7.0;
+          if (distToMouse < mouseRadius) {
+            float mouseFactor = (1.0 - distToMouse / mouseRadius);
+            float ripple = sin(distToMouse * 2.2 - uTime * 3.5) * 0.6 * mouseFactor;
+            elevation += ripple + mouseFactor * 0.8;
+          }
+
+          vElevation = elevation;
+          pos.z += elevation;
+
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          vDepth = -mvPosition.z;
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uOpacity;
+        varying float vElevation;
+        varying float vDepth;
+        varying vec2 vUv;
+
+        void main() {
+          // Líneas wireframe en tonos grises/carbón elegantes sobre fondo blanco
+          vec3 valleyColor = vec3(0.12, 0.15, 0.20);
+          vec3 peakColor   = vec3(0.35, 0.40, 0.48);
+
+          float hNorm = clamp((vElevation + 2.0) / 4.5, 0.0, 1.0);
+          vec3 lineColor = mix(valleyColor, peakColor, hNorm);
+
+          // Integración y difuminado suave de bordes
+          float fadeX = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
+          float fadeY = smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
+          float edgeAlpha = fadeX * fadeY;
+
+          // Niebla de profundidad hacia el horizonte
+          float fogFactor = smoothstep(35.0, 10.0, vDepth);
+
+          float alpha = uOpacity * edgeAlpha * fogFactor * 0.75;
+
+          gl_FragColor = vec4(lineColor, alpha);
+        }
+      `
+    });
+
+    this.waterWaves = new THREE.Mesh(geo, mat);
+    // Posicionamiento de cámara estilo vista de dron inclinado hacia el frente
+    this.waterWaves.position.set(0, -1.8, -8.0);
+    this.waterWaves.rotation.x = -1.25;
+    this.waterWaves.visible = false;
+    this.scene.add(this.waterWaves);
+  }
+
+  showWaterWaves() {
+    if (!this.waterWaves) {
+      this.initWaterWaves();
+    }
+    if (this.waterWaves) {
+      this.waterWaves.visible = true;
+      if (this.waterWaves.material.uniforms) {
+        gsap.to(this.waterWaves.material.uniforms.uOpacity, {
+          value: 1, duration: 1.5, ease: 'power2.inOut'
+        });
+      }
+    }
+  }
+
+  hideWaterWaves() {
+    if (!this.waterWaves) return;
+    if (this.waterWaves.material.uniforms) {
+      gsap.to(this.waterWaves.material.uniforms.uOpacity, {
+        value: 0, duration: 0.8, ease: 'power2.inOut',
+        onComplete: () => { this.waterWaves.visible = false; }
+      });
+    }
+  }
+
   // Manejar el cambio de posición de la cámara según la sección activa (Efecto Cinematic Scroll)
   triggerSectionTransition(sectionId) {
     this.activeSection = sectionId;
@@ -1064,6 +1277,20 @@ export class SimbiotikWebGL {
       this.transitionToParticles();
     } else if (this.logoParticleMode) {
       this.transitionToSolid();
+    }
+
+    // Mostrar agujero negro únicamente en la sección Agujero Negro (memoria-intro)
+    if (sectionId === 'memoria-intro') {
+      this.showBlackHole();
+    } else {
+      this.hideBlackHole();
+    }
+
+    // Terreno wireframe 3D únicamente en la sección Memoria Natural (memoria-natural)
+    if (sectionId === 'memoria-natural') {
+      this.showWaterWaves();
+    } else {
+      this.hideWaterWaves();
     }
     
     switch (sectionId) {
@@ -1081,6 +1308,12 @@ export class SimbiotikWebGL {
         break;
       case 'memoria-intro':
         // Logo 3D centrado en el fondo y alejado 2 unidades sobre Z respecto a la base (targetCamZ = 7.0)
+        targetCamZ = 7.0;
+        targetCamX = 0.0;
+        targetCamY = 0.0;
+        this.logoSpinSpeed = 0.002;
+        break;
+      case 'memoria-natural':
         targetCamZ = 7.0;
         targetCamX = 0.0;
         targetCamY = 0.0;
@@ -1261,8 +1494,12 @@ export class SimbiotikWebGL {
       }
     }
     
-    // Rotar partículas globales
+    // Ocultar logo 3D de fondo y partículas durante Memoria Natural para no traslapar con el fondo blanco
+    if (this.logoGroup) {
+      this.logoGroup.visible = (this.activeSection !== 'memoria-natural');
+    }
     if (this.particleSystem) {
+      this.particleSystem.visible = (this.activeSection !== 'memoria-natural');
       this.particleSystem.rotation.y += 0.0006;
     }
 
@@ -1283,10 +1520,10 @@ export class SimbiotikWebGL {
       const baseRotY = (scrollY / Math.max(1, centerScroll)) * Math.PI;
       const goldFactor = (1.0 - Math.cos(baseRotY)) / 2.0;
 
-      // Lerp suave de rotaciones X, Y y Z para la sección Memoria Natural
-      const isMemoria = (this.activeSection === 'memoria-intro');
+      // Lerp suave de rotaciones X, Y y Z para las secciones Memoria Natural y Agujero Negro
+      const isMemoria = (this.activeSection === 'memoria-intro' || this.activeSection === 'memoria-natural');
 
-      // Ocultar las partículas que caen de arriba a abajo únicamente en Memoria Natural
+      // Ocultar las partículas que caen de arriba a abajo únicamente en Agujero Negro y Memoria Natural
       if (this.spiralSystem) {
         this.spiralSystem.visible = !isMemoria;
       }
@@ -1377,6 +1614,16 @@ export class SimbiotikWebGL {
     // Animar campo de pasto dinámico
     if (this.grassSystem && this.grassSystem.visible && this.grassMaterial) {
       this.grassMaterial.uniforms.uTime.value += 0.016;
+    }
+
+    // Animar terreno wireframe (vista dron + reacción sutil al cursor)
+    if (this.waterWaves && this.waterWaves.visible && this.waterWaves.material.uniforms) {
+      this.waterWaves.material.uniforms.uTime.value += 0.016;
+
+      const targetRotY = this.uniforms.uMouse.value.x * 0.06;
+      const targetRotZ = -this.uniforms.uMouse.value.y * 0.04;
+      this.waterWaves.rotation.y += (targetRotY - this.waterWaves.rotation.y) * 0.05;
+      this.waterWaves.rotation.z += (targetRotZ - this.waterWaves.rotation.z) * 0.05;
     }
 
     // Carrusel horizontal del manifiesto: las tarjetas se deslizan de derecha a izquierda con el scroll
