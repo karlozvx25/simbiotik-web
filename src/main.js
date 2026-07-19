@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Escuchar redimensionamiento de pantalla para recalcular posiciones de scroll
   window.addEventListener('resize', updateSidebarState);
 
-  // Helper unificado para obtener el scroll Y exacto para centrar o alinear cada sección
+  // Helper unificado para obtener el scroll Y exacto del centro magnético de cada sección
   const getTargetScrollForSection = (section) => {
     if (!section) return 0;
 
@@ -132,12 +132,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const sectionHeight = rect.height;
     const viewportHeight = window.innerHeight;
 
-    // Caso Especial 1: Simbiosis Sonido (centro magnético en la rotación frontal a la mitad del scroll)
+    // Inicio: Tope absoluto del viewport
+    if (section.id === 'inicio') {
+      return 0;
+    }
+
+    // Simbiosis Sonido: Centro magnético exacto a la mitad de su espacio de scroll (180 deg cromo)
     if (section.id === 'simbiosis-sonido') {
       return sectionTop + viewportHeight;
     }
 
-    // Caso Especial 2: Manifiesto (se alinea para que el subtítulo y tarjetas queden visibles)
+    // Manifiesto: Alineación con subtítulo y tarjetas visibles
     if (section.id === 'manifiesto') {
       const headerHeight = document.querySelector('.navbar')?.offsetHeight || 60;
       const techSubtitle = section.querySelector('.tech-subtitle');
@@ -147,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Caso Especial 3: Offsets específicos para otras secciones de la página
+    // Offsets específicos para encuadre ideal
     const sectionOffsets = {
       'memoria-intro': -20,
       'simbolo': -25
@@ -508,43 +513,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isSnapping || isNavigating) return;
 
     const scrollY = window.scrollY;
-    const viewportHeight = window.innerHeight;
-    const viewportCenter = scrollY + viewportHeight / 2;
 
     let nearestSection = null;
     let minDistance = Infinity;
     let targetY = 0;
 
     sections.forEach(section => {
-      const rect = section.getBoundingClientRect();
-      const sectionTop = scrollY + rect.top;
-      const sectionHeight = rect.height;
-      const sectionCenter = sectionTop + sectionHeight / 2;
-      const distance = Math.abs(viewportCenter - sectionCenter);
+      const idealTargetY = getTargetScrollForSection(section);
+      const distance = Math.abs(scrollY - idealTargetY);
 
       if (distance < minDistance) {
         minDistance = distance;
         nearestSection = section;
-        
-        targetY = getTargetScrollForSection(section);
+        targetY = idealTargetY;
       }
     });
 
     if (nearestSection) {
       // Evitar micro-ajustes si ya está casi perfectamente centrado
-      if (Math.abs(targetY - scrollY) > 5) {
+      if (Math.abs(targetY - scrollY) > 8) {
         isSnapping = true;
         
         // Forzar visibilidad
         nearestSection.classList.add('visible');
 
         lenis.scrollTo(targetY, {
-          duration: 1.0,
+          duration: 0.9,
           easing: (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2, // easeInOutQuad
           onComplete: () => {
             setTimeout(() => {
               isSnapping = false;
-            }, 150);
+            }, 100);
           }
         });
       }
@@ -559,9 +558,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Si el usuario está scrolleando activamente o navegando, cancelar la cola
     if (isSnapping || isNavigating) return;
 
-    // Solo activar si la velocidad de scroll baja de un umbral (sugerencia de parada)
-    if (Math.abs(e.velocity) < 0.8) {
-      snapTimeout = setTimeout(performSnap, 250);
+    // Activar el snap magnético automáticamente al ralentizarse o soltar el scroll
+    if (Math.abs(e.velocity) < 1.2) {
+      snapTimeout = setTimeout(performSnap, 150);
     }
   });
 });
