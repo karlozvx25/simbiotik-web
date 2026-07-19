@@ -1291,7 +1291,7 @@ export class SimbiotikWebGL {
         this.spiralSystem.visible = !isMemoria;
       }
 
-      const targetRotX = isMemoria ? ((20 * Math.PI) / 180) : 0;       // 20 grados en X
+      const targetRotX = isMemoria ? ((95 * Math.PI) / 180) : 0;       // 95 grados en X
       const targetRotYOffset = isMemoria ? ((80 * Math.PI) / 180) : 0; // 80 grados en Y
       const targetRotZ = isMemoria ? (-Math.PI / 10) : 0;              // Inclinación diagonal previa (-18 deg)
 
