@@ -1291,9 +1291,9 @@ export class SimbiotikWebGL {
         this.spiralSystem.visible = !isMemoria;
       }
 
-      const targetRotX = isMemoria ? (Math.PI / 2.6) : 0;         // Inclinación frontal (~69 deg)
-      const targetRotYOffset = isMemoria ? ((90 * Math.PI) / 180) : 0; // 90 grados en Y
-      const targetRotZ = isMemoria ? (-Math.PI / 10) : 0;        // Inclinación diagonal previa de Saturno (-18 deg)
+      const targetRotX = isMemoria ? (Math.PI / 2.6) : 0;          // Inclinación frontal (~69 deg)
+      const targetRotYOffset = isMemoria ? ((115 * Math.PI) / 180) : 0; // 115 grados en Y
+      const targetRotZ = isMemoria ? (-Math.PI / 10) : 0;         // Inclinación diagonal previa de Saturno (-18 deg)
 
       if (this.currentLogoRotX === undefined) this.currentLogoRotX = 0;
       if (this.currentLogoRotYOffset === undefined) this.currentLogoRotYOffset = 0;
