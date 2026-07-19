@@ -1096,18 +1096,20 @@ body::-webkit-scrollbar {
   text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
 }
 
-/* Glitch char styling - Forzar tipografía monospace pura para evitar marcas de agua de fuentes demo */
+/* Glitch char styling - Estilo cian neón geométrico futurista basado en la imagen de referencia */
 .glitch-char,
 .scramble-text .glitch-char,
 .hero-title .glitch-char,
 h1 .glitch-char,
 h2 .glitch-char,
 a .glitch-char {
-  color: var(--color-electric);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  color: var(--color-electric) !important;
+  font-family: 'Space Grotesk', sans-serif !important;
   font-style: normal !important;
-  font-weight: normal !important;
-  opacity: 0.85;
+  font-weight: 700 !important;
+  text-shadow: 0 0 8px #38bdf8, 0 0 16px rgba(56, 189, 248, 0.7) !important;
+  opacity: 1 !important;
+  display: inline-block;
 }
 
 /* RESPONSIVE DESIGN */
