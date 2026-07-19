@@ -1517,15 +1517,13 @@ body::-webkit-scrollbar {
   opacity: 0; /* Iniciar oculto para aparecer con scroll */
   transition: none; /* Evita desfase en la animación de scroll */
 
-  /* Ajuste de posición: desplazar hacia abajo del centro del logo */
-  --shift-base: 700px; /* Desplazado 700px hacia abajo */
+  /* Elevación sutil al hacer scroll para encajar exactamente en el centro */
   --lift: calc((1.0 - var(--gold-factor, 0)) * 20px);
-  transform: translateY(calc(var(--shift-base) + var(--lift)));
+  transform: translateY(var(--lift));
 }
 
 @media (max-width: 768px) {
   .simbiosis-title {
-    --shift-base: 300px; /* Shift proporcional en móvil */
     font-size: 1.6rem;
     padding: 0 16px;
     line-height: 1.4;
