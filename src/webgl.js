@@ -1291,6 +1291,13 @@ export class SimbiotikWebGL {
         this.spiralSystem.visible = !isMemoria;
       }
 
+      // Giro continuo alrededor del eje Z únicamente en la sección Memoria Natural
+      if (isMemoria) {
+        this.memoriaZSpin = (this.memoriaZSpin || 0) + 0.003;
+      } else {
+        this.memoriaZSpin = 0;
+      }
+
       const targetRotX = isMemoria ? ((100 * Math.PI) / 180) : 0;        // 100 grados en X
       const targetRotYOffset = isMemoria ? ((110 * Math.PI) / 180) : 0; // 110 grados en Y
       const targetRotZ = isMemoria ? (-Math.PI / 10) : 0;              // Inclinación diagonal previa (-18 deg)
@@ -1310,7 +1317,7 @@ export class SimbiotikWebGL {
 
       this.logoGroup.rotation.y = baseRotY + this.currentLogoRotYOffset;
       this.logoGroup.rotation.x = this.currentLogoRotX;
-      this.logoGroup.rotation.z = this.currentLogoRotZ;
+      this.logoGroup.rotation.z = this.currentLogoRotZ + this.memoriaZSpin;
       this.logoGroup.scale.set(1.0, 1.0, this.currentLogoScaleZ);
 
       // Animar el texto de la sección Simbiosis: entra por la izquierda, se centra perfecto y sale rápidamente por la derecha
