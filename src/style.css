@@ -1487,20 +1487,18 @@ body::-webkit-scrollbar {
   height: 200vh;
 }
 
-.simbiosis-sticky-wrapper {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  width: 100%;
+.simbiosis-floating-wrapper {
+  position: fixed;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  z-index: 20; /* Asegura que el texto aparezca por encima del logo y overlays */
-  overflow: hidden; /* Evita desbordamiento horizontal al deslizar el texto */
+  z-index: 20; /* Flota por encima del canvas 3D y overlays */
+  overflow: hidden; /* Evita desbordamiento horizontal al deslizar la frase */
 }
 
-.simbiosis-sticky-wrapper * {
+.simbiosis-floating-wrapper * {
   pointer-events: auto;
 }
 
