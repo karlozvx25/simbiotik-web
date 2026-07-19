@@ -1280,21 +1280,30 @@ export class SimbiotikWebGL {
       }
 
       // El giro del logo inicia de forma fluida desde el primer píxel de scroll
-      const rotY = (scrollY / Math.max(1, centerScroll)) * Math.PI;
-      const goldFactor = (1.0 - Math.cos(rotY)) / 2.0;
+      const baseRotY = (scrollY / Math.max(1, centerScroll)) * Math.PI;
+      const goldFactor = (1.0 - Math.cos(baseRotY)) / 2.0;
 
-      // Lerp suave de rotación X y Z para la sección Memoria Natural (90 grados en Z)
+      // Lerp suave de rotaciones X, Y y Z para la sección Memoria Natural
       const isMemoria = (this.activeSection === 'memoria-intro');
-      const targetRotX = isMemoria ? (Math.PI / 2.6) : 0;  // Inclinación frontal (~69 deg)
-      const targetRotZ = isMemoria ? ((90 * Math.PI) / 180) : 0; // 90 grados en Z
+
+      // Ocultar las partículas que caen de arriba a abajo únicamente en Memoria Natural
+      if (this.spiralSystem) {
+        this.spiralSystem.visible = !isMemoria;
+      }
+
+      const targetRotX = isMemoria ? (Math.PI / 2.6) : 0;         // Inclinación frontal (~69 deg)
+      const targetRotYOffset = isMemoria ? ((90 * Math.PI) / 180) : 0; // 90 grados en Y
+      const targetRotZ = isMemoria ? (-Math.PI / 10) : 0;        // Inclinación diagonal previa de Saturno (-18 deg)
 
       if (this.currentLogoRotX === undefined) this.currentLogoRotX = 0;
+      if (this.currentLogoRotYOffset === undefined) this.currentLogoRotYOffset = 0;
       if (this.currentLogoRotZ === undefined) this.currentLogoRotZ = 0;
 
       this.currentLogoRotX += (targetRotX - this.currentLogoRotX) * 0.05;
+      this.currentLogoRotYOffset += (targetRotYOffset - this.currentLogoRotYOffset) * 0.05;
       this.currentLogoRotZ += (targetRotZ - this.currentLogoRotZ) * 0.05;
 
-      this.logoGroup.rotation.y = rotY;
+      this.logoGroup.rotation.y = baseRotY + this.currentLogoRotYOffset;
       this.logoGroup.rotation.x = this.currentLogoRotX;
       this.logoGroup.rotation.z = this.currentLogoRotZ;
       this.logoGroup.scale.set(1.0, 1.0, 1.0);
