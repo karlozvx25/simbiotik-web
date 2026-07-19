@@ -2,7 +2,7 @@
 export class TextScramble {
   constructor(el) {
     this.el = el;
-    this.chars = '!<>-_\\/[]{}—=+*^?#________';
+    this.chars = '<>-_\\/[]{}—=+*^124578________';
     this.update = this.update.bind(this);
   }
   
@@ -40,7 +40,7 @@ export class TextScramble {
           char = this.randomChar();
           this.queue[i].char = char;
         }
-        output += `<span class="glitch-char">${char}</span>`;
+        output += `<span class="glitch-char" style="font-family: 'Space Grotesk', sans-serif !important; font-weight: 700 !important; font-style: normal !important; text-shadow: 0 0 8px #38bdf8, 0 0 16px rgba(56, 189, 248, 0.7) !important; color: #38bdf8 !important; display: inline-block;">${char}</span>`;
       } else {
         output += from;
       }

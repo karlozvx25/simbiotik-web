@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Escuchar redimensionamiento de pantalla para recalcular posiciones de scroll
   window.addEventListener('resize', updateSidebarState);
 
-  // Helper unificado para obtener el scroll Y exacto para centrar o alinear cada sección
+  // Helper unificado para obtener el scroll Y exacto del centro magnético de cada sección
   const getTargetScrollForSection = (section) => {
     if (!section) return 0;
 
@@ -132,12 +132,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const sectionHeight = rect.height;
     const viewportHeight = window.innerHeight;
 
-    // Caso Especial 1: Simbiosis Sonido (centro magnético en la rotación frontal a la mitad del scroll)
+    // Inicio: Tope absoluto del viewport
+    if (section.id === 'inicio') {
+      return 0;
+    }
+
+    // Simbiosis Sonido: Centro magnético exacto a la mitad de su espacio de scroll (180 deg cromo)
     if (section.id === 'simbiosis-sonido') {
       return sectionTop + viewportHeight;
     }
 
-    // Caso Especial 2: Manifiesto (se alinea para que el subtítulo y tarjetas queden visibles)
+    // Manifiesto: Alineación con subtítulo y tarjetas visibles
     if (section.id === 'manifiesto') {
       const headerHeight = document.querySelector('.navbar')?.offsetHeight || 60;
       const techSubtitle = section.querySelector('.tech-subtitle');
@@ -147,7 +152,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Caso Especial 3: Offsets específicos para otras secciones de la página
+    // Memoria Natural: Centro magnético fijado exactamente en el punto donde desaparece por completo el agujero negro
+    if (section.id === 'memoria-natural') {
+      return sectionTop + sectionHeight / 2 - viewportHeight / 2;
+    }
+
+    // Offsets específicos para encuadre ideal
     const sectionOffsets = {
       'memoria-intro': -20,
       'simbolo': -25
@@ -395,6 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'inicio': { state: 'idle', color: '#38bdf8' },
     'simbiosis-sonido': { state: 'idle', color: '#38bdf8' },
     'memoria-intro': { state: 'active', color: '#7f1d1d' },
+    'memoria-natural': { state: 'active', color: '#0284c7' },
     'simbolo': { state: 'core', color: '#6d28d9' },
     'manifiesto': { state: 'memory', color: '#b88945' },
     'press-kit': { state: 'memory', color: '#b88945' },
@@ -421,9 +432,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sectionId === lastActiveSection) return;
         lastActiveSection = sectionId;
         
+        // Actualizar clase de sección activa en document.body para controlar z-index CSS
+        document.body.className = document.body.className.replace(/\bsection-[\w-]+\b/g, '').trim();
+        document.body.classList.add(`section-${sectionId}`);
+
         // Mover cámara WebGL según la sección activa en el scroll
         webgl.triggerSectionTransition(sectionId);
         
+        // Ocultar retícula técnica (.tech-grid) únicamente en la sección Agujero Negro (memoria-intro)
+        const techGrid = document.querySelector('.tech-grid');
+        if (techGrid) {
+          if (sectionId === 'memoria-intro') {
+            techGrid.style.transition = 'opacity 0.6s ease';
+            techGrid.style.opacity = '0';
+          } else {
+            techGrid.style.transition = 'opacity 0.6s ease';
+            techGrid.style.opacity = '1';
+          }
+        }
+
         // Actualizar menú activo en el menú lateral del hero
         document.querySelectorAll('.hero-sidebar-links a').forEach(l => {
           l.classList.remove('active');
@@ -443,12 +470,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sectionId === 'simbolo') {
           // Mostrar SVG overlay y ocultar logo 3D con un ligero retraso
           setTimeout(() => {
-            svgOverlay.classList.add('visible');
+            if (svgOverlay) svgOverlay.classList.add('visible');
             webgl.setLogoVisibility(false);
           }, 600);
         } else {
           // Ocultar SVG overlay y restaurar logo 3D
-          svgOverlay.classList.remove('visible');
+          if (svgOverlay) svgOverlay.classList.remove('visible');
           webgl.setLogoVisibility(true);
         }
       }
@@ -508,43 +535,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isSnapping || isNavigating) return;
 
     const scrollY = window.scrollY;
-    const viewportHeight = window.innerHeight;
-    const viewportCenter = scrollY + viewportHeight / 2;
 
     let nearestSection = null;
     let minDistance = Infinity;
     let targetY = 0;
 
     sections.forEach(section => {
-      const rect = section.getBoundingClientRect();
-      const sectionTop = scrollY + rect.top;
-      const sectionHeight = rect.height;
-      const sectionCenter = sectionTop + sectionHeight / 2;
-      const distance = Math.abs(viewportCenter - sectionCenter);
+      const idealTargetY = getTargetScrollForSection(section);
+      const distance = Math.abs(scrollY - idealTargetY);
 
       if (distance < minDistance) {
         minDistance = distance;
         nearestSection = section;
-        
-        targetY = getTargetScrollForSection(section);
+        targetY = idealTargetY;
       }
     });
 
     if (nearestSection) {
       // Evitar micro-ajustes si ya está casi perfectamente centrado
-      if (Math.abs(targetY - scrollY) > 5) {
+      if (Math.abs(targetY - scrollY) > 8) {
         isSnapping = true;
         
         // Forzar visibilidad
         nearestSection.classList.add('visible');
 
         lenis.scrollTo(targetY, {
-          duration: 1.0,
+          duration: 0.9,
           easing: (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2, // easeInOutQuad
           onComplete: () => {
             setTimeout(() => {
               isSnapping = false;
-            }, 150);
+            }, 100);
           }
         });
       }
@@ -556,12 +577,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (snapTimeout) clearTimeout(snapTimeout);
 
-    // Si el usuario está scrolleando activamente o navegando, cancelar la cola
+    // Cancelar si el sistema ya está realizando un snap o navegación programada
     if (isSnapping || isNavigating) return;
 
-    // Solo activar si la velocidad de scroll baja de un umbral (sugerencia de parada)
-    if (Math.abs(e.velocity) < 0.8) {
-      snapTimeout = setTimeout(performSnap, 250);
+    // Activar inmediatamente el encuadre magnético al ralentizarse o soltar el scroll
+    if (Math.abs(e.velocity) < 0.6) {
+      snapTimeout = setTimeout(performSnap, 100);
     }
   });
 });

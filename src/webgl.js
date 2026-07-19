@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import gsap from 'gsap';
 
 
-// Vertex Shader para las partículas de fondo (Restaurado al original)
+// Vertex Shader para las partículas de fondo (Movimiento únicamente orbital alrededor del logo 3D)
 const vertexShader = `
   uniform float uTime;
   uniform float uAudioFreq;
@@ -18,24 +18,19 @@ const vertexShader = `
   void main() {
     vec3 pos = position;
     
-    // Ruido sinusoidal e impulso del audio
-    float wave = sin(pos.x * 1.5 + uTime * 1.2) * cos(pos.y * 1.5 + uTime * 1.2) * 0.3;
-    pos.z += wave * (1.0 + uAudioFreq * 6.0);
-    
-    // Interacción con la posición normalizada del mouse
+    // Interacción suave de deformación sólo al acercarse el cursor
     float distToMouse = distance(pos.xy, uMouse * 3.5);
-    if (distToMouse < 2.2) {
-      float force = (2.2 - distToMouse) * 0.45;
-      pos.z += force * sin(uTime * 6.0);
-      pos.x += force * uMouse.x * 0.2;
-      pos.y += force * uMouse.y * 0.2;
+    if (distToMouse < 1.8) {
+      float force = (1.8 - distToMouse) * 0.25;
+      pos.x += force * uMouse.x * 0.15;
+      pos.y += force * uMouse.y * 0.15;
     }
     
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
     
-    // Modulación del tamaño según la cercanía y la frecuencia del bajo musical
-    gl_PointSize = (14.0 / -mvPosition.z) * (1.0 + uAudioFreq * 0.9);
+    // Tamaño de partícula estable según la profundidad de campo
+    gl_PointSize = (14.0 / -mvPosition.z);
     
     vColor = color;
     vOpacity = (0.3 + 0.7 * sin(uTime * aRandoms.x + aRandoms.y)) * (1.0 - uNewSectionProgress);
@@ -177,6 +172,23 @@ export class SimbiotikWebGL {
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
     this.camera.position.z = 6;
 
+    // Inicializar canvas secundario dedicado para la cuadrícula 3D de terreno (waves-canvas)
+    this.wavesCanvas = document.getElementById('waves-canvas');
+    if (this.wavesCanvas) {
+      this.wavesRenderer = new THREE.WebGLRenderer({ 
+        canvas: this.wavesCanvas, 
+        antialias: true, 
+        alpha: true,
+        powerPreference: "high-performance"
+      });
+      this.wavesRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      this.wavesRenderer.setSize(window.innerWidth, window.innerHeight);
+
+      this.wavesScene = new THREE.Scene();
+      this.wavesCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+      this.wavesCamera.position.z = 6;
+    }
+
     this.uniforms = {
       uTime: { value: 0 },
       uAudioFreq: { value: 0 },
@@ -190,6 +202,8 @@ export class SimbiotikWebGL {
     this.logoVertices = null;
     this.logoParticles = null;
     this.logoParticleMode = false;
+    this.activeSection = 'inicio';
+    this.currentLogoRotX = 0;
 
     this.initParticles();
     this.initSpiralParticles();
@@ -1054,8 +1068,223 @@ export class SimbiotikWebGL {
     });
   }
 
+  // Inicialización del Agujero Negro 3D (Singularidad al 20% del diámetro del logotipo 3D)
+  initBlackHole() {
+    this.blackHoleGroup = new THREE.Group();
+
+    // Diámetro del logotipo 3D = 2.8 unidades -> 20% del diámetro = 0.56 unidades (Radio = 0.28)
+    const coreRadius = 0.28;
+    const outerRadius = 0.65;
+
+    // 1. Núcleo Oscuro (Horizonte de Sucesos)
+    const coreGeo = new THREE.SphereGeometry(coreRadius, 64, 64);
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      side: THREE.FrontSide
+    });
+    this.blackHoleCore = new THREE.Mesh(coreGeo, coreMat);
+    this.blackHoleGroup.add(this.blackHoleCore);
+
+    // 2. Anillo de Acreción Carmesí / Singularidad
+    const glowGeo = new THREE.RingGeometry(coreRadius, outerRadius, 64);
+    const glowMat = new THREE.ShaderMaterial({
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uOpacity: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying float vRadius;
+        void main() {
+          vUv = uv;
+          vRadius = length(position.xy);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uOpacity;
+        varying vec2 vUv;
+        varying float vRadius;
+
+        void main() {
+          float dist = (vRadius - 0.28) / 0.37;
+          vec3 innerGlow = vec3(0.95, 0.12, 0.05); // Carmesí brillante
+          vec3 outerGlow = vec3(0.40, 0.02, 0.01); // Carmesí profundo
+
+          vec3 color = mix(innerGlow, outerGlow, dist);
+          float ringPattern = sin(dist * 20.0 - uTime * 3.0) * 0.15 + 0.85;
+          float alpha = uOpacity * smoothstep(0.0, 0.08, dist) * smoothstep(1.0, 0.2, dist) * ringPattern;
+
+          gl_FragColor = vec4(color, alpha * 0.92);
+        }
+      `
+    });
+
+    this.blackHoleGlow = new THREE.Mesh(glowGeo, glowMat);
+    this.blackHoleGlow.rotation.x = Math.PI / 2.5; // Inclinación estilizada
+    this.blackHoleGroup.add(this.blackHoleGlow);
+
+    // Centrado exactamente con el logo 3D en el fondo
+    this.blackHoleGroup.position.set(0, 0, -0.2);
+    this.blackHoleGroup.visible = false;
+    this.scene.add(this.blackHoleGroup);
+  }
+
+  showBlackHole() {
+    if (!this.blackHoleGroup) {
+      this.initBlackHole();
+    }
+    if (this.blackHoleGroup) {
+      this.blackHoleGroup.visible = true;
+      if (this.blackHoleGlow && this.blackHoleGlow.material.uniforms) {
+        gsap.to(this.blackHoleGlow.material.uniforms.uOpacity, {
+          value: 1, duration: 1.2, ease: 'power2.inOut'
+        });
+      }
+    }
+  }
+
+  hideBlackHole() {
+    if (!this.blackHoleGroup) return;
+    if (this.blackHoleGlow && this.blackHoleGlow.material.uniforms) {
+      gsap.to(this.blackHoleGlow.material.uniforms.uOpacity, {
+        value: 0, duration: 0.8, ease: 'power2.inOut',
+        onComplete: () => { this.blackHoleGroup.visible = false; }
+      });
+    }
+  }
+
+  initWaterWaves() {
+    // Malla 3D wireframe de alta densidad (vista dron estilo paisaje digital)
+    const geo = new THREE.PlaneGeometry(60, 45, 140, 140);
+
+    const mat = new THREE.ShaderMaterial({
+      wireframe: true,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uMouse: this.uniforms.uMouse,
+        uOpacity: { value: 0 }
+      },
+      vertexShader: `
+        uniform float uTime;
+        uniform vec2 uMouse;
+        uniform float uOpacity;
+        varying float vElevation;
+        varying float vDepth;
+        varying vec2 vUv;
+
+        // Función matemática continua que genera relieve de montañas y valles
+        float getElevation(vec2 p, float t) {
+          // Desplazamiento continuo en Y simulando el vuelo infinito hacia al frente (bucle sin cortes)
+          vec2 pos = vec2(p.x * 0.2, (p.y + t * 2.2) * 0.2);
+          
+          float h = 0.0;
+          h += sin(pos.x * 0.8 + pos.y * 1.0) * 1.5;
+          h += cos(pos.x * 0.5 - pos.y * 1.3) * 1.2;
+          h += sin((pos.x + pos.y) * 1.8) * 0.6;
+          h += cos(pos.x * 2.5 - pos.y * 2.0) * 0.35;
+          h += sin(pos.x * 4.5 + pos.y * 4.0) * 0.15;
+          return h;
+        }
+
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+
+          // Calcular elevación del terreno
+          float elevation = getElevation(pos.xy, uTime);
+
+          // Interacción con el cursor: deformación y ondas dinámicas cerca del mouse
+          vec2 mouseTarget = uMouse * vec2(15.0, 10.0);
+          float distToMouse = distance(pos.xy, mouseTarget);
+          float mouseRadius = 7.0;
+          if (distToMouse < mouseRadius) {
+            float mouseFactor = (1.0 - distToMouse / mouseRadius);
+            float ripple = sin(distToMouse * 2.2 - uTime * 3.5) * 0.6 * mouseFactor;
+            elevation += ripple + mouseFactor * 0.8;
+          }
+
+          vElevation = elevation;
+          pos.z += elevation;
+
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          vDepth = -mvPosition.z;
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uOpacity;
+        varying float vElevation;
+        varying float vDepth;
+        varying vec2 vUv;
+
+        void main() {
+          // Líneas wireframe en tonos grises/carbón elegantes sobre fondo blanco
+          vec3 valleyColor = vec3(0.12, 0.15, 0.20);
+          vec3 peakColor   = vec3(0.35, 0.40, 0.48);
+
+          float hNorm = clamp((vElevation + 2.0) / 4.5, 0.0, 1.0);
+          vec3 lineColor = mix(valleyColor, peakColor, hNorm);
+
+          // Integración y difuminado suave de bordes
+          float fadeX = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
+          float fadeY = smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
+          float edgeAlpha = fadeX * fadeY;
+
+          // Niebla de profundidad hacia el horizonte
+          float fogFactor = smoothstep(35.0, 10.0, vDepth);
+
+          float alpha = uOpacity * edgeAlpha * fogFactor * 0.75;
+
+          gl_FragColor = vec4(lineColor, alpha);
+        }
+      `
+    });
+
+    this.waterWaves = new THREE.Mesh(geo, mat);
+    // Posicionamiento de cámara estilo vista de dron inclinado hacia el frente
+    this.waterWaves.position.set(0, -1.8, -8.0);
+    this.waterWaves.rotation.x = -1.25;
+    this.waterWaves.visible = false;
+    const targetScene = this.wavesScene || this.scene;
+    targetScene.add(this.waterWaves);
+  }
+
+  showWaterWaves() {
+    if (!this.waterWaves) {
+      this.initWaterWaves();
+    }
+    if (this.waterWaves) {
+      this.waterWaves.visible = true;
+      if (this.waterWaves.material.uniforms) {
+        gsap.to(this.waterWaves.material.uniforms.uOpacity, {
+          value: 1, duration: 1.5, ease: 'power2.inOut'
+        });
+      }
+    }
+  }
+
+  hideWaterWaves() {
+    if (!this.waterWaves) return;
+    if (this.waterWaves.material.uniforms) {
+      gsap.to(this.waterWaves.material.uniforms.uOpacity, {
+        value: 0, duration: 0.8, ease: 'power2.inOut',
+        onComplete: () => { this.waterWaves.visible = false; }
+      });
+    }
+  }
+
   // Manejar el cambio de posición de la cámara según la sección activa (Efecto Cinematic Scroll)
   triggerSectionTransition(sectionId) {
+    this.activeSection = sectionId;
     let targetCamZ = 6;
     let targetCamY = 0;
     let targetCamX = 0;
@@ -1066,6 +1295,20 @@ export class SimbiotikWebGL {
       this.transitionToParticles();
     } else if (this.logoParticleMode) {
       this.transitionToSolid();
+    }
+
+    // Mostrar agujero negro en la sección Agujero Negro (memoria-intro) y conservarlo en Memoria Natural (memoria-natural)
+    if (sectionId === 'memoria-intro' || sectionId === 'memoria-natural') {
+      this.showBlackHole();
+    } else {
+      this.hideBlackHole();
+    }
+
+    // Terreno wireframe 3D activo desde Agujero Negro (memoria-intro) y continuando en Memoria Natural (memoria-natural)
+    if (sectionId === 'memoria-intro' || sectionId === 'memoria-natural') {
+      this.showWaterWaves();
+    } else {
+      this.hideWaterWaves();
     }
     
     switch (sectionId) {
@@ -1082,10 +1325,16 @@ export class SimbiotikWebGL {
         this.logoSpinSpeed = 0.005;
         break;
       case 'memoria-intro':
-        // Acercar la cámara a la derecha, dejando el logo cargado a la izquierda
-        targetCamZ = 4.5;
-        targetCamX = -1.2;
-        targetCamY = 0.2;
+        // Logo 3D centrado en el fondo y alejado 2 unidades sobre Z respecto a la base (targetCamZ = 7.0)
+        targetCamZ = 7.0;
+        targetCamX = 0.0;
+        targetCamY = 0.0;
+        this.logoSpinSpeed = 0.002;
+        break;
+      case 'memoria-natural':
+        targetCamZ = 7.0;
+        targetCamX = 0.0;
+        targetCamY = 0.0;
         this.logoSpinSpeed = 0.002;
         break;
       case 'simbolo':
@@ -1123,7 +1372,12 @@ export class SimbiotikWebGL {
       y: targetCamY,
       z: targetCamZ,
       duration: 1.8,
-      ease: "power2.inOut"
+      ease: "power2.inOut",
+      onUpdate: () => {
+        if (this.wavesCamera) {
+          this.wavesCamera.position.copy(this.camera.position);
+        }
+      }
     });
   }
 
@@ -1138,6 +1392,12 @@ export class SimbiotikWebGL {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+      if (this.wavesCamera && this.wavesRenderer) {
+        this.wavesCamera.aspect = window.innerWidth / window.innerHeight;
+        this.wavesCamera.updateProjectionMatrix();
+        this.wavesRenderer.setSize(window.innerWidth, window.innerHeight);
+      }
     });
   }
 
@@ -1263,59 +1523,154 @@ export class SimbiotikWebGL {
       }
     }
     
-    // Rotar partículas globales
+    // El logo 3D permanece visible continuamente en todas las secciones (incluyendo Memoria Natural)
+    if (this.logoGroup) {
+      this.logoGroup.visible = true;
+    }
     if (this.particleSystem) {
+      this.particleSystem.visible = true;
       this.particleSystem.rotation.y += 0.0006;
     }
 
     // Rotar logotipo interactivo en base al scroll vertical (ajustado para dar exactamente la media vuelta en la sección Simbiosis)
+    // Rotar logotipo interactivo en base al scroll vertical desde el primer momento
     if (this.logoGroup) {
       const scrollY = window.scrollY || document.documentElement.scrollTop;
+      const viewHeight = window.innerHeight;
       
-      // La media vuelta (PI rad) se completa en el punto medio de la sección Simbiosis (scrollY = 2 * viewport height)
-      const targetScroll = 2.0 * window.innerHeight;
-      this.logoGroup.rotation.y = scrollY * (Math.PI / targetScroll);
-      
-      this.logoGroup.rotation.x = 0;
-      this.logoGroup.rotation.z = 0;
-      
-      // Logotipo estático en escala (sin vibración/pulsación de audio)
-      this.logoGroup.scale.set(1.0, 1.0, 1.0);
-
-      // Calcular el factor de oro basado en el ángulo de rotación Y
-      // (el coseno hace que el cambio sea suave: 0 en el frente, 1 al dar medio giro de 180 deg)
-      const angle = this.logoGroup.rotation.y;
-      const goldFactor = (1.0 - Math.cos(angle)) / 2.0;
-
-      // Hacer aparecer la frase "Donde la simbiosis humana se convierte en sonido"
-      // controlando su opacidad y elevación mediante el factor de oro en CSS
-      const simbiosisTitle = document.querySelector('.simbiosis-title');
-      if (simbiosisTitle) {
-        simbiosisTitle.style.opacity = Math.pow(goldFactor, 1.2); // Entrada más rápida y opaca
-        simbiosisTitle.style.setProperty('--gold-factor', goldFactor);
+      const simbiosisSec = document.getElementById('simbiosis-sonido');
+      let centerScroll = 2.0 * viewHeight;
+      if (simbiosisSec) {
+        const secRect = simbiosisSec.getBoundingClientRect();
+        centerScroll = scrollY + secRect.top + viewHeight;
       }
 
-      // Actualizar propiedades físicas del material para fundir a metal cromo brillante
-      this.logoGroup.traverse((child) => {
-        if (child.isMesh) {
-          const mat = child.material;
-          if (mat && mat.type === 'MeshPhysicalMaterial') {
-            // Transición a cromo pulido líquido en el reverso
-            mat.metalness = goldFactor; // 0.0 en el frente (vidrio), 1.0 al reverso (metal cromo)
-            mat.transmission = 1.0 - goldFactor; // 1.0 en el frente (transparente), 0.0 al reverso (opaco)
-            mat.roughness = 0.1 * goldFactor + 0.0 * (1.0 - goldFactor); // 0.1 para reflejos satinados metálicos suaves
-            mat.clearcoat = goldFactor * 1.0; // Capa de laca brillante líquida
-            mat.clearcoatRoughness = 0.02; // Reflejo secundario nítido
-            mat.opacity = 0.4 + goldFactor * 0.6; // 40% de opacidad en frente, 100% de opacidad al reverso
-            mat.transparent = true;
-            mat.thickness = 2.5 * (1.0 - goldFactor);
-            
-            // Interpolar color al blanco cromo brillante
-            const chromeColor = new THREE.Color("#ffffff");
-            mat.color.copy(this.colorTheme).lerp(chromeColor, goldFactor);
-          }
+      // El giro del logo inicia de forma fluida desde el primer píxel de scroll
+      const baseRotY = (scrollY / Math.max(1, centerScroll)) * Math.PI;
+      const goldFactor = (1.0 - Math.cos(baseRotY)) / 2.0;
+
+      // Lerp suave de rotaciones X, Y y Z para las secciones Memoria Natural y Agujero Negro
+      const isMemoria = (this.activeSection === 'memoria-intro' || this.activeSection === 'memoria-natural');
+      // Ocultar las partículas que caen de arriba a abajo en Agujero Negro, Memoria Natural y El Símbolo
+      const isHiddenSpiral = (isMemoria || this.activeSection === 'simbolo');
+      if (this.spiralSystem) {
+        this.spiralSystem.visible = !isHiddenSpiral;
+      }
+
+      // Giro continuo alrededor del eje Z únicamente en la sección Memoria Natural
+      if (isMemoria) {
+        this.memoriaZSpin = (this.memoriaZSpin || 0) + 0.003;
+      } else {
+        this.memoriaZSpin = 0;
+      }
+
+      const isSimbolo = (this.activeSection === 'simbolo');
+      const targetRotX = isMemoria ? ((110 * Math.PI) / 180) : 0;        // 110 grados en X
+      const targetRotYOffset = isMemoria ? ((100 * Math.PI) / 180) : (isSimbolo ? ((50 * Math.PI) / 180) : 0); // 50 grados en Y para El Símbolo
+      const targetRotZ = isMemoria ? (-Math.PI / 10) : 0;              // Inclinación diagonal previa (-18 deg)
+
+      // Escalar la profundidad Z al 25% (0.25) únicamente en la sección Memoria Natural
+      const targetScaleZ = isMemoria ? 0.25 : 1.0;
+
+      if (this.currentLogoRotX === undefined) this.currentLogoRotX = 0;
+      if (this.currentLogoRotYOffset === undefined) this.currentLogoRotYOffset = 0;
+      if (this.currentLogoRotZ === undefined) this.currentLogoRotZ = 0;
+      if (this.currentLogoScaleZ === undefined) this.currentLogoScaleZ = 1.0;
+
+      this.currentLogoRotX += (targetRotX - this.currentLogoRotX) * 0.05;
+      this.currentLogoRotYOffset += (targetRotYOffset - this.currentLogoRotYOffset) * 0.05;
+      this.currentLogoRotZ += (targetRotZ - this.currentLogoRotZ) * 0.05;
+      this.currentLogoScaleZ += (targetScaleZ - this.currentLogoScaleZ) * 0.05;
+
+      this.logoGroup.rotation.y = baseRotY + this.currentLogoRotYOffset;
+      this.logoGroup.rotation.x = this.currentLogoRotX;
+      this.logoGroup.rotation.z = this.currentLogoRotZ + this.memoriaZSpin;
+      this.logoGroup.scale.set(1.0, 1.0, this.currentLogoScaleZ);
+
+      // Animar el texto de la sección Simbiosis: entra por la izquierda, se centra perfecto y sale rápidamente por la derecha
+      const simbiosisTitle = document.querySelector('.simbiosis-title');
+      if (simbiosisTitle) {
+        // Desfase normalizado respecto al centro magnético exacto (-1 al inicio, 0 al centro, +1 al final)
+        const offset = (scrollY - centerScroll) / viewHeight;
+        
+        let shiftX = 0;
+        let opacity = 0;
+
+        if (offset <= 0) {
+          // Entrada desde la izquierda hacia el centro magnético (-60vw a 0vw)
+          shiftX = offset * 60;
+          opacity = Math.max(0, 1.0 - Math.pow(Math.abs(offset), 1.2));
+        } else {
+          // Salida acelerada hacia la derecha para desaparecer totalmente antes de Memoria Natural
+          shiftX = offset * 130; // Movimiento más rápido a la derecha
+          opacity = Math.max(0, 1.0 - offset * 2.5); // Desaparece a 0 opacidad en offset ~0.4
         }
-      });
+
+        simbiosisTitle.style.transform = `translateX(${shiftX}vw)`;
+        simbiosisTitle.style.opacity = opacity;
+      }
+
+      // Calcular la posición del centro magnético de la sección Memoria Natural
+      const memoriaSec = document.getElementById('memoria-natural');
+      let memoriaCenterProgress = 1.0; // 1.0 fuera del centro (visible), 0.0 en el centro magnético (desaparecen totalmente)
+
+      if (memoriaSec) {
+        const rect = memoriaSec.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const sectionCenterY = rect.top + Math.min(rect.height, vh) / 2.0;
+        const viewportCenterY = vh / 2.0;
+        const distFromCenter = Math.abs(sectionCenterY - viewportCenterY);
+        const deadZone = 30.0; // Rango extendido 30px arriba y 30px abajo (60px total) donde permanece 100% desaparecido
+        const fadeRadius = vh * 0.55;
+
+        if (distFromCenter <= deadZone) {
+          memoriaCenterProgress = 0.0;
+        } else if (distFromCenter < fadeRadius) {
+          const normDist = (distFromCenter - deadZone) / (fadeRadius - deadZone);
+          // Curva coseno (0.0 en el rango desvanecido -> 1.0 al alejarse arriba o abajo)
+          memoriaCenterProgress = 0.5 - 0.5 * Math.cos(normDist * Math.PI);
+        }
+      }
+
+      // Aplicar visibilidad y opacidad al Agujero Negro 3D
+      if (this.blackHoleGroup) {
+        const isBlackHoleSec = (this.activeSection === 'memoria-intro' || this.activeSection === 'memoria-natural');
+        this.blackHoleGroup.visible = isBlackHoleSec && (memoriaCenterProgress > 0.001);
+
+        if (this.blackHoleGlow && this.blackHoleGlow.material.uniforms) {
+          this.blackHoleGlow.material.uniforms.uOpacity.value = memoriaCenterProgress;
+        }
+        if (this.blackHoleHalo && this.blackHoleHalo.material.uniforms) {
+          this.blackHoleHalo.material.uniforms.uOpacity.value = memoriaCenterProgress;
+        }
+      }
+
+      // Aplicar visibilidad y opacidad al Logotipo 3D
+      if (this.logoGroup) {
+        this.logoGroup.visible = (memoriaCenterProgress > 0.001);
+
+        // Actualizar propiedades físicas del material para fundir a metal cromo brillante
+        this.logoGroup.traverse((child) => {
+          if (child.isMesh) {
+            const mat = child.material;
+            if (mat && mat.type === 'MeshPhysicalMaterial') {
+              // Transición a cromo pulido líquido en el reverso
+              mat.metalness = goldFactor; // 0.0 en el frente (vidrio), 1.0 al reverso (metal cromo)
+              mat.transmission = 1.0 - goldFactor; // 1.0 en el frente (transparente), 0.0 al reverso (opaco)
+              mat.roughness = 0.1 * goldFactor + 0.0 * (1.0 - goldFactor); // 0.1 para reflejos satinados metálicos suaves
+              mat.clearcoat = goldFactor * 1.0; // Capa de laca brillante líquida
+              mat.clearcoatRoughness = 0.02; // Reflejo secundario nítido
+              mat.opacity = (0.4 + goldFactor * 0.6) * memoriaCenterProgress; // Desaparece al 0% en el centro magnético
+              mat.transparent = true;
+              mat.thickness = 2.5 * (1.0 - goldFactor);
+              
+              // Interpolar color al blanco cromo brillante
+              const chromeColor = new THREE.Color("#ffffff");
+              mat.color.copy(this.colorTheme).lerp(chromeColor, goldFactor);
+            }
+          }
+        });
+      }
     }
     
     // Animar partículas del logo (descomposición en perlas)
@@ -1329,6 +1684,16 @@ export class SimbiotikWebGL {
     // Animar campo de pasto dinámico
     if (this.grassSystem && this.grassSystem.visible && this.grassMaterial) {
       this.grassMaterial.uniforms.uTime.value += 0.016;
+    }
+
+    // Animar terreno wireframe (vista dron + reacción sutil al cursor)
+    if (this.waterWaves && this.waterWaves.visible && this.waterWaves.material.uniforms) {
+      this.waterWaves.material.uniforms.uTime.value += 0.016;
+
+      const targetRotY = this.uniforms.uMouse.value.x * 0.06;
+      const targetRotZ = -this.uniforms.uMouse.value.y * 0.04;
+      this.waterWaves.rotation.y += (targetRotY - this.waterWaves.rotation.y) * 0.05;
+      this.waterWaves.rotation.z += (targetRotZ - this.waterWaves.rotation.z) * 0.05;
     }
 
     // Carrusel horizontal del manifiesto: las tarjetas se deslizan de derecha a izquierda con el scroll
@@ -1357,5 +1722,8 @@ export class SimbiotikWebGL {
     }
 
     this.renderer.render(this.scene, this.camera);
+    if (this.wavesRenderer && this.wavesScene && this.wavesCamera) {
+      this.wavesRenderer.render(this.wavesScene, this.wavesCamera);
+    }
   }
 }
