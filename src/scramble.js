@@ -2,7 +2,7 @@
 export class TextScramble {
   constructor(el) {
     this.el = el;
-    this.chars = '!<>-_\\/[]{}—=+*^?#________';
+    this.chars = '<>-_\\/[]{}—=+*^124578________';
     this.update = this.update.bind(this);
   }
   
