@@ -1610,24 +1610,22 @@ export class SimbiotikWebGL {
         simbiosisTitle.style.opacity = opacity;
       }
 
-      // Calcular la posición del centro magnético de la sección Memoria Natural
+      // Calcular la posición del centro magnético de la sección Memoria Natural (-70px offset)
       const memoriaSec = document.getElementById('memoria-natural');
       let memoriaCenterProgress = 1.0; // 1.0 fuera del centro (visible), 0.0 en el centro magnético (desaparecen totalmente)
 
       if (memoriaSec) {
         const rect = memoriaSec.getBoundingClientRect();
         const vh = window.innerHeight;
-        const sectionCenterY = rect.top + Math.min(rect.height, vh) / 2.0;
-        const viewportCenterY = vh / 2.0;
-        const distFromCenter = Math.abs(sectionCenterY - viewportCenterY);
-        const deadZone = 30.0; // Rango extendido 30px arriba y 30px abajo (60px total) donde permanece 100% desaparecido
+        const targetTop = (vh - rect.height) / 2.0 + 70;
+        const distFromCenter = Math.abs(rect.top - targetTop);
+        const deadZone = 40.0; // Rango extendido donde permanece 100% desaparecido
         const fadeRadius = vh * 0.55;
 
         if (distFromCenter <= deadZone) {
           memoriaCenterProgress = 0.0;
         } else if (distFromCenter < fadeRadius) {
           const normDist = (distFromCenter - deadZone) / (fadeRadius - deadZone);
-          // Curva coseno (0.0 en el rango desvanecido -> 1.0 al alejarse arriba o abajo)
           memoriaCenterProgress = 0.5 - 0.5 * Math.cos(normDist * Math.PI);
         }
       }

@@ -127,55 +127,53 @@ document.addEventListener('DOMContentLoaded', () => {
   const getTargetScrollForSection = (section) => {
     if (!section) return 0;
 
-    const rect = section.getBoundingClientRect();
-    const sectionTop = window.scrollY + rect.top;
-    const sectionHeight = rect.height;
-    const viewportHeight = window.innerHeight;
+    // Calcular posición absoluta en el documento libre de fluctuaciones durante el scroll
+    let sectionTop = 0;
+    let curr = section;
+    while (curr) {
+      sectionTop += curr.offsetTop;
+      curr = curr.offsetParent;
+    }
 
-    // Inicio: Tope absoluto del viewport
+    const sectionHeight = section.offsetHeight;
+    const viewportHeight = window.innerHeight;
+    const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 60;
+
+    // 1. Inicio (Hero)
     if (section.id === 'inicio') {
       return 0;
     }
 
-    // Simbiosis Sonido: Centro magnético exacto a la mitad de su espacio de scroll (180 deg cromo)
+    // 2. Simbiosis Sonido
     if (section.id === 'simbiosis-sonido') {
-      return sectionTop + viewportHeight;
+      return Math.max(0, sectionTop + (sectionHeight > viewportHeight ? viewportHeight : sectionHeight / 2 - viewportHeight / 2));
     }
 
-    // Manifiesto: Alineación con subtítulo y tarjetas visibles
+    // 3. Agujero Negro (memoria-intro): centro magnético anterior (-20px offset)
+    if (section.id === 'memoria-intro') {
+      return Math.max(0, sectionTop - 20);
+    }
+
+    // 4. Memoria Natural: última configuración (-70px offset)
+    if (section.id === 'memoria-natural') {
+      return Math.max(0, sectionTop + sectionHeight / 2 - viewportHeight / 2 - 70);
+    }
+
+    // 5. El Símbolo: centro magnético vertical (-5px offset)
+    if (section.id === 'simbolo') {
+      return Math.max(0, sectionTop + sectionHeight / 2 - viewportHeight / 2 - 5);
+    }
+
+    // 6. Manifiesto: alineación de cabecera debajo de la barra de navegación
     if (section.id === 'manifiesto') {
-      const headerHeight = document.querySelector('.navbar')?.offsetHeight || 60;
       const techSubtitle = section.querySelector('.tech-subtitle');
       if (techSubtitle) {
-        const subRect = techSubtitle.getBoundingClientRect();
-        return window.scrollY + subRect.top - headerHeight - 25;
+        return Math.max(0, sectionTop + techSubtitle.offsetTop - navbarHeight - 20);
       }
     }
 
-    // Memoria Natural: Centro magnético fijado exactamente en el punto donde desaparece por completo el agujero negro
-    if (section.id === 'memoria-natural') {
-      return sectionTop + sectionHeight / 2 - viewportHeight / 2;
-    }
-
-    // Offsets específicos para encuadre ideal
-    const sectionOffsets = {
-      'memoria-intro': -20,
-      'simbolo': -25
-    };
-    
-    if (sectionOffsets[section.id] !== undefined) {
-      return sectionTop + sectionOffsets[section.id];
-    }
-
-    // Caso Estándar:
-    if (sectionHeight <= viewportHeight) {
-      // Centrar verticalmente en pantalla si cabe completo
-      return sectionTop + sectionHeight / 2 - viewportHeight / 2;
-    } else {
-      // Alinear al tope de la sección con offset para el navbar
-      const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 60;
-      return sectionTop - navbarHeight;
-    }
+    // Caso Estándar: centrado vertical exacto de la sección respecto al viewport
+    return Math.max(0, sectionTop + sectionHeight / 2 - viewportHeight / 2);
   };
 
   function raf(time) {
