@@ -1577,11 +1577,11 @@ export class SimbiotikWebGL {
         this.logoSpinSpeed = 0.008;
         break;
       case 'contacto':
-        // Centrado íntimo
-        targetCamZ = 5.0;
+        // Logo 3D totalmente de frente, centrado y mostrando el círculo completo
+        targetCamZ = 8.5;
         targetCamX = 0.0;
-        targetCamY = -0.5;
-        this.logoSpinSpeed = 0.006;
+        targetCamY = 0.0;
+        this.logoSpinSpeed = 0.0;
         break;
     }
 
@@ -1769,8 +1769,8 @@ export class SimbiotikWebGL {
 
       // Lerp suave de rotaciones X, Y y Z para las secciones Memoria Natural y Agujero Negro
       const isMemoria = (this.activeSection === 'memoria-intro' || this.activeSection === 'memoria-natural');
-      // Ocultar las partículas que caen de arriba a abajo en Agujero Negro, Memoria Natural, El Símbolo, El Manifiesto y Press Kit
-      const isHiddenSpiral = (isMemoria || this.activeSection === 'simbolo' || this.activeSection === 'manifiesto' || this.activeSection === 'press-kit');
+      // Ocultar las partículas que caen de arriba a abajo en Agujero Negro, Memoria Natural, El Símbolo, El Manifiesto, Press Kit y Contacto
+      const isHiddenSpiral = (isMemoria || this.activeSection === 'simbolo' || this.activeSection === 'manifiesto' || this.activeSection === 'press-kit' || this.activeSection === 'contacto');
       if (this.spiralSystem) {
         this.spiralSystem.visible = !isHiddenSpiral;
       }
@@ -1808,10 +1808,25 @@ export class SimbiotikWebGL {
       this.currentLogoRotZ += (targetRotZ - this.currentLogoRotZ) * 0.05;
       this.currentLogoScaleZ += (targetScaleZ - this.currentLogoScaleZ) * 0.05;
 
-      this.logoGroup.rotation.y = baseRotY + this.currentLogoRotYOffset + this.pressKitYSpin;
-      this.logoGroup.rotation.x = this.currentLogoRotX;
-      this.logoGroup.rotation.z = this.currentLogoRotZ + this.memoriaZSpin;
-      this.logoGroup.scale.set(1.0, 1.0, this.currentLogoScaleZ);
+      const isContacto = (this.activeSection === 'contacto');
+      if (isContacto) {
+        // En sección Contacto: alinear el logo 3D 100% de frente (sin inclinación X/Z ni giro Y)
+        const idealY = baseRotY + this.currentLogoRotYOffset;
+        const targetFrontY = Math.round(idealY / (Math.PI * 2)) * Math.PI * 2;
+        if (this.contactoRotY === undefined) this.contactoRotY = idealY;
+        this.contactoRotY += (targetFrontY - this.contactoRotY) * 0.08;
+
+        this.logoGroup.rotation.x += (0 - this.logoGroup.rotation.x) * 0.08;
+        this.logoGroup.rotation.y = this.contactoRotY;
+        this.logoGroup.rotation.z += (0 - this.logoGroup.rotation.z) * 0.08;
+        this.logoGroup.scale.set(1.0, 1.0, 1.0);
+      } else {
+        this.contactoRotY = undefined;
+        this.logoGroup.rotation.y = baseRotY + this.currentLogoRotYOffset + this.pressKitYSpin;
+        this.logoGroup.rotation.x = this.currentLogoRotX;
+        this.logoGroup.rotation.z = this.currentLogoRotZ + this.memoriaZSpin;
+        this.logoGroup.scale.set(1.0, 1.0, this.currentLogoScaleZ);
+      }
 
       // Animar el texto de la sección Simbiosis: entra por la izquierda, se centra perfecto y sale rápidamente por la derecha
       const simbiosisTitle = document.querySelector('.simbiosis-title');
@@ -1927,24 +1942,44 @@ export class SimbiotikWebGL {
       if (this.logoGroup) {
         this.logoGroup.visible = this.isLogoVisible && (combinedLogoProgress > 0.001);
 
-        // Actualizar propiedades físicas del material para fundir a metal cromo brillante
+        // Actualizar propiedades físicas del material para la sección Contacto o fundir a metal cromo brillante
+        const isContacto = (this.activeSection === 'contacto');
+        const grayColor = new THREE.Color("#71717a");
+
         this.logoGroup.traverse((child) => {
           if (child.isMesh) {
             const mat = child.material;
             if (mat && mat.type === 'MeshPhysicalMaterial') {
-              // Transición a cromo pulido líquido en el reverso
-              mat.metalness = goldFactor; // 0.0 en el frente (vidrio), 1.0 al reverso (metal cromo)
-              mat.transmission = 1.0 - goldFactor; // 1.0 en el frente (transparente), 0.0 al reverso (opaco)
-              mat.roughness = 0.1 * goldFactor + 0.0 * (1.0 - goldFactor); // 0.1 para reflejos satinados metálicos suaves
-              mat.clearcoat = goldFactor * 1.0; // Capa de laca brillante líquida
-              mat.clearcoatRoughness = 0.02; // Reflejo secundario nítido
-              mat.opacity = (0.4 + goldFactor * 0.6) * combinedLogoProgress; // Desaparece al 0% en Manifiesto y centro magnético
-              mat.transparent = true;
-              mat.thickness = 2.5 * (1.0 - goldFactor);
-              
-              // Interpolar color al blanco cromo brillante
-              const chromeColor = new THREE.Color("#ffffff");
-              mat.color.copy(this.colorTheme).lerp(chromeColor, goldFactor);
+              if (isContacto) {
+                // En sección Contacto: color gris elegante y opacidad al 9%
+                mat.color.copy(grayColor);
+                mat.opacity = 0.09 * combinedLogoProgress;
+                mat.transparent = true;
+                mat.metalness = 0.1;
+                mat.transmission = 0.2;
+                mat.roughness = 0.3;
+                mat.clearcoat = 0.5;
+              } else {
+                // Transición a cromo pulido líquido en el reverso
+                mat.metalness = goldFactor; // 0.0 en el frente (vidrio), 1.0 al reverso (metal cromo)
+                mat.transmission = 1.0 - goldFactor; // 1.0 en el frente (transparente), 0.0 al reverso (opaco)
+                mat.roughness = 0.1 * goldFactor + 0.0 * (1.0 - goldFactor); // 0.1 para reflejos satinados metálicos suaves
+                mat.clearcoat = goldFactor * 1.0; // Capa de laca brillante líquida
+                mat.clearcoatRoughness = 0.02; // Reflejo secundario nítido
+                mat.opacity = (0.4 + goldFactor * 0.6) * combinedLogoProgress; // Desaparece al 0% en Manifiesto y centro magnético
+                mat.transparent = true;
+                mat.thickness = 2.5 * (1.0 - goldFactor);
+                
+                // Interpolar color al blanco cromo brillante
+                const chromeColor = new THREE.Color("#ffffff");
+                mat.color.copy(this.colorTheme).lerp(chromeColor, goldFactor);
+              }
+            } else if (child.material) {
+              if (isContacto) {
+                if (child.material.color) child.material.color.copy(grayColor);
+                child.material.opacity = 0.09 * combinedLogoProgress;
+                child.material.transparent = true;
+              }
             }
           }
         });

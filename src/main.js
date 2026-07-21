@@ -436,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'simbolo': { state: 'core', color: '#6d28d9' },
     'manifiesto': { state: 'memory', color: '#b88945' },
     'press-kit': { state: 'memory', color: '#b88945' },
-    'contacto': { state: 'signal', color: '#1e40af' }
+    'contacto': { state: 'signal', color: '#71717a' }
   };
 
   let lastActiveSection = null;
@@ -466,16 +466,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mover cámara WebGL según la sección activa en el scroll
         webgl.triggerSectionTransition(sectionId);
 
-        // Ocultar retícula técnica (.tech-grid) en las secciones Agujero Negro (memoria-intro), El Manifiesto (manifiesto) y Press Kit (press-kit)
-        const techGrid = document.querySelector('.tech-grid');
-        if (techGrid) {
-          techGrid.style.transition = 'opacity 0.6s ease';
-          if (sectionId === 'memoria-intro' || sectionId === 'manifiesto' || sectionId === 'press-kit') {
-            techGrid.style.opacity = '0';
-          } else {
-            techGrid.style.opacity = '1';
-          }
-        }
 
         // Actualizar menú activo en el menú lateral del hero
         document.querySelectorAll('.hero-sidebar-links a').forEach(l => {

@@ -111,23 +111,7 @@ body.section-memoria-natural #waves-canvas {
 
 /* Capas decorativas de cuadrícula técnica y scanlines */
 .tech-grid {
-  position: fixed;
-  inset: 0;
-  background-image: 
-    linear-gradient(rgba(56, 189, 248, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.02) 1px, transparent 1px);
-  background-size: 50px 50px;
-  background-position: center center;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.8;
-  transition: opacity 0.6s ease;
-}
-
-body.section-memoria-intro .tech-grid,
-body.section-manifiesto .tech-grid,
-body.section-press-kit .tech-grid {
-  opacity: 0 !important;
+  display: none !important;
 }
 
 .scanlines {
