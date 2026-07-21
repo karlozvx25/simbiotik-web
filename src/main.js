@@ -158,13 +158,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return Math.max(0, absTop + rect.height / 2 - vh / 2 - 55);
     }
 
-    // 5. Manifiesto (Alineado debajo de la barra de navegación)
+    // 5. El Manifiesto: centro magnético alineado al encabezado y barra de navegación
     if (section.id === 'manifiesto') {
       const techSubtitle = section.querySelector('.tech-subtitle');
       if (techSubtitle) {
         const subRect = techSubtitle.getBoundingClientRect();
         return Math.max(0, currentScrollY + subRect.top - navbarHeight - 20);
       }
+      const container = section.querySelector('.container') || section;
+      const rect = container.getBoundingClientRect();
+      return Math.max(0, currentScrollY + rect.top);
+    }
+
+    // 6. Press Kit: centro magnético dedicado para encuadrar perfectamente el contenido
+    if (section.id === 'press-kit') {
+      const container = section.querySelector('.container') || section;
+      const rect = container.getBoundingClientRect();
+      const absTop = currentScrollY + rect.top;
+      return Math.max(0, absTop + rect.height / 2 - vh / 2 - 25);
     }
 
     // 4. Secciones Generales (Agujero Negro, Memoria Natural, El Símbolo, Press Kit, Contacto, etc.)
@@ -455,14 +466,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mover cámara WebGL según la sección activa en el scroll
         webgl.triggerSectionTransition(sectionId);
 
-        // Ocultar retícula técnica (.tech-grid) únicamente en la sección Agujero Negro (memoria-intro)
+        // Ocultar retícula técnica (.tech-grid) en las secciones Agujero Negro (memoria-intro), El Manifiesto (manifiesto) y Press Kit (press-kit)
         const techGrid = document.querySelector('.tech-grid');
         if (techGrid) {
-          if (sectionId === 'memoria-intro') {
-            techGrid.style.transition = 'opacity 0.6s ease';
+          techGrid.style.transition = 'opacity 0.6s ease';
+          if (sectionId === 'memoria-intro' || sectionId === 'manifiesto' || sectionId === 'press-kit') {
             techGrid.style.opacity = '0';
           } else {
-            techGrid.style.transition = 'opacity 0.6s ease';
             techGrid.style.opacity = '1';
           }
         }
