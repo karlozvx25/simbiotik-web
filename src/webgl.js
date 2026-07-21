@@ -202,6 +202,8 @@ export class SimbiotikWebGL {
     this.logoVertices = null;
     this.logoParticles = null;
     this.logoParticleMode = false;
+    this.slenderWomanMesh = null;
+    this.slenderWomanGroup = null;
     this.activeSection = 'inicio';
     this.currentLogoRotX = 0;
 
@@ -210,6 +212,8 @@ export class SimbiotikWebGL {
     this.initPlaceholderLogo();
     this.initTunnel();
     this.initGrass();
+    this.initCodeVortex();
+    this.loadSlenderWomanModel('/Slender_Woman_Lores.glb');
     this.bindEvents();
     this.animate();
   }
@@ -679,6 +683,222 @@ export class SimbiotikWebGL {
     }, undefined, (error) => {
       console.error("Error cargando el modelo GLTF/GLB:", error);
     });
+  }
+
+  // Cargar modelo 3D Slender_Woman_Lores para la sección Manifiesto
+  loadSlenderWomanModel(url) {
+    const loader = new GLTFLoader();
+    loader.load(url, (gltf) => {
+      this.slenderWomanMesh = gltf.scene;
+
+      const box = new THREE.Box3().setFromObject(this.slenderWomanMesh);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+
+      // Escalar un 35% más grande (de 5.2 a 7.02 unidades)
+      const targetSize = 5.2 * 1.35;
+      const scale = targetSize / (maxDim || 1);
+      this.slenderWomanMesh.scale.set(scale, scale, scale);
+
+      // Centrar modelo en su origen local
+      const center = box.getCenter(new THREE.Vector3());
+      this.slenderWomanMesh.position.x = -center.x * scale;
+      this.slenderWomanMesh.position.y = -center.y * scale;
+      this.slenderWomanMesh.position.z = -center.z * scale;
+
+      this.slenderWomanGroup = new THREE.Group();
+      this.slenderWomanGroup.add(this.slenderWomanMesh);
+
+      // Posición en la escena: en el centro (Z = -0.5)
+      this.slenderWomanGroup.position.set(0, -0.5, -0.5);
+      this.slenderWomanGroup.visible = false;
+      this.scene.add(this.slenderWomanGroup);
+
+      // Aplicar material físico elegante con el color #b87fbc
+      this.slenderWomanMesh.traverse((child) => {
+        if (child.isMesh) {
+          child.material = new THREE.MeshPhysicalMaterial({
+            color: new THREE.Color("#b87fbc"),
+            metalness: 0.65,
+            roughness: 0.2,
+            transmission: 0.25,
+            thickness: 1.5,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.08,
+            transparent: true,
+            opacity: 0.0,
+            side: THREE.DoubleSide
+          });
+        }
+      });
+      console.log("Modelo 3D Slender Woman cargado para Manifiesto.");
+    }, undefined, (err) => {
+      console.warn("Error al cargar Slender_Woman_Lores.glb:", err);
+    });
+  }
+
+  // Vórtice de líneas de código en azul eléctrico en forma de huracán para la base del modelo 3D en El Manifiesto
+  initCodeVortex() {
+    const particleCount = 17000;
+    const geometry = new THREE.BufferGeometry();
+
+    const positions = new Float32Array(particleCount * 3);
+    const spiralRadius = new Float32Array(particleCount);
+    const spiralAngle = new Float32Array(particleCount);
+    const armIndex = new Float32Array(particleCount);
+    const sizeScale = new Float32Array(particleCount);
+    const speed = new Float32Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      // Ojo central en r = 0.6, radio máximo extendido un +50% (r = 7.2)
+      const r = 0.6 + Math.pow(Math.random(), 1.4) * 6.3;
+      const angle = Math.random() * Math.PI * 2;
+      const arm = Math.floor(Math.random() * 4); // 4 brazos espirales principales
+
+      positions[i * 3] = 0;
+      positions[i * 3 + 1] = 0;
+      positions[i * 3 + 2] = 0;
+
+      spiralRadius[i] = r;
+      spiralAngle[i] = angle;
+      armIndex[i] = arm;
+      sizeScale[i] = 0.6 + Math.random() * 1.4;
+      speed[i] = 0.7 + Math.random() * 0.6;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('aSpiralRadius', new THREE.BufferAttribute(spiralRadius, 1));
+    geometry.setAttribute('aSpiralAngle', new THREE.BufferAttribute(spiralAngle, 1));
+    geometry.setAttribute('aArmIndex', new THREE.BufferAttribute(armIndex, 1));
+    geometry.setAttribute('aSizeScale', new THREE.BufferAttribute(sizeScale, 1));
+    geometry.setAttribute('aSpeed', new THREE.BufferAttribute(speed, 1));
+
+    // Generar textura atlas para caracteres y líneas de código azul neón
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    ctx.clearRect(0, 0, 512, 512);
+    ctx.font = 'bold 24px monospace';
+    ctx.fillStyle = '#00d2ff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const codeTokens = [
+      '0101011', '0x38BDF8', '{ code }', '=>', 'SIMBIOTIK',
+      'fn()', '<vortex>', '01101', 'import', 'const=true;',
+      '0x7F90', '[MANIFIESTO]', 'sync()', '01001', '&&'
+    ];
+
+    for (let y = 0; y < 4; y++) {
+      for (let x = 0; x < 4; x++) {
+        const token = codeTokens[(y * 4 + x) % codeTokens.length];
+        const px = x * 128 + 64;
+        const py = y * 128 + 64;
+        ctx.shadowColor = '#00d2ff';
+        ctx.shadowBlur = 12;
+        ctx.fillText(token, px, py);
+      }
+    }
+
+    const codeTexture = new THREE.CanvasTexture(canvas);
+    codeTexture.wrapS = THREE.RepeatWrapping;
+    codeTexture.wrapT = THREE.RepeatWrapping;
+
+    const vortexVertexShader = `
+      uniform float uTime;
+      uniform float uVortexOpacity;
+      attribute float aSpiralRadius;
+      attribute float aSpiralAngle;
+      attribute float aArmIndex;
+      attribute float aSizeScale;
+      attribute float aSpeed;
+
+      varying float vRadiusNorm;
+      varying float vOpacity;
+      varying vec3 vColor;
+
+      void main() {
+        // Rotación helicoidal tipo huracán (más rápida en el centro, suave en los bordes)
+        float angularVelocity = (2.8 / (aSpiralRadius + 0.4)) * uTime * 0.35 * aSpeed;
+        float currentAngle = aSpiralAngle + angularVelocity;
+
+        // 4 brazos espirales principales (logarítmicos)
+        float spiralOffset = log(aSpiralRadius + 1.0) * 2.2 + (aArmIndex * 1.57079);
+        float finalAngle = currentAngle + spiralOffset;
+
+        float r = aSpiralRadius + sin(uTime * 1.4 + aSpiralRadius * 3.0) * 0.08;
+
+        // Posición en el plano XZ con ligera fluctuación senoidal en Y
+        vec3 pos = vec3(
+          cos(finalAngle) * r,
+          sin(uTime * 1.8 + aSpiralRadius * 3.5) * 0.12,
+          sin(finalAngle) * r
+        );
+
+        vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+
+        gl_PointSize = (aSizeScale * 26.0 / -mvPosition.z) * uVortexOpacity;
+
+        vRadiusNorm = (r - 0.6) / 6.3;
+
+        // Degradado Azul Eléctrico -> Cyan Cibernético brillante
+        vec3 colorCyan = vec3(0.0, 0.88, 1.0);   // Cyan neón (#00e1ff)
+        vec3 colorBlue = vec3(0.12, 0.42, 0.98); // Azul vibrante (#1f6bff)
+        vColor = mix(colorCyan, colorBlue, vRadiusNorm);
+
+        // Ojo central vacío en r < 0.6 y desvanecimiento suave en los bordes externos extendidos (hasta r = 7.2)
+        float eyeFade = smoothstep(0.5, 0.85, r);
+        float edgeFade = 1.0 - smoothstep(5.4, 7.2, r);
+        vOpacity = eyeFade * edgeFade * uVortexOpacity;
+      }
+    `;
+
+    const vortexFragmentShader = `
+      uniform sampler2D uTexture;
+      varying float vRadiusNorm;
+      varying float vOpacity;
+      varying vec3 vColor;
+
+      void main() {
+        vec2 coord = gl_PointCoord;
+        float dist = distance(coord, vec2(0.5));
+        if (dist > 0.5) discard;
+
+        vec4 texColor = texture2D(uTexture, coord);
+        float glow = pow(1.0 - dist * 2.0, 1.4);
+
+        vec3 finalColor = vColor * (1.3 + glow);
+        gl_FragColor = vec4(finalColor, vOpacity * glow * 0.9);
+      }
+    `;
+
+    this.codeVortexMaterial = new THREE.ShaderMaterial({
+      vertexShader: vortexVertexShader,
+      fragmentShader: vortexFragmentShader,
+      uniforms: {
+        uTime: { value: 0 },
+        uVortexOpacity: { value: 0 },
+        uTexture: { value: codeTexture }
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    this.codeVortexMesh = new THREE.Points(geometry, this.codeVortexMaterial);
+
+    this.codeVortexGroup = new THREE.Group();
+    this.codeVortexGroup.add(this.codeVortexMesh);
+
+    // Posicionamiento en el centro de la escena 3D con rotación de 90 grados sobre el eje X
+    this.codeVortexGroup.position.set(0, 0, -0.5);
+    this.codeVortexGroup.rotation.x = -Math.PI * 0.5; // 90 grados de rotación sobre el eje X
+    this.codeVortexGroup.visible = false;
+
+    this.scene.add(this.codeVortexGroup);
   }
 
 
@@ -1290,10 +1510,8 @@ export class SimbiotikWebGL {
     let targetCamX = 0;
     let targetRotationY = 0;
     
-    // Transicionar logo a partículas al entrar a Manifiesto, restaurar al salir
-    if (sectionId === 'manifiesto') {
-      this.transitionToParticles();
-    } else if (this.logoParticleMode) {
+    // Restaurar modo sólido si estaba en partículas
+    if (this.logoParticleMode) {
       this.transitionToSolid();
     }
 
@@ -1352,11 +1570,11 @@ export class SimbiotikWebGL {
         this.logoSpinSpeed = 0.003;
         break;
       case 'press-kit':
-        // Rotación de cámara lateral
-        targetCamZ = 7.0;
-        targetCamX = 1.0;
-        targetCamY = 0.5;
-        this.logoSpinSpeed = 0.001;
+        // Logo 3D alejado y ubicado en el lado derecho de la pantalla rotando activamente sobre el eje Y
+        targetCamZ = 9.5;
+        targetCamX = -3.6;
+        targetCamY = 0.0;
+        this.logoSpinSpeed = 0.008;
         break;
       case 'contacto':
         // Centrado íntimo
@@ -1551,8 +1769,8 @@ export class SimbiotikWebGL {
 
       // Lerp suave de rotaciones X, Y y Z para las secciones Memoria Natural y Agujero Negro
       const isMemoria = (this.activeSection === 'memoria-intro' || this.activeSection === 'memoria-natural');
-      // Ocultar las partículas que caen de arriba a abajo en Agujero Negro, Memoria Natural y El Símbolo
-      const isHiddenSpiral = (isMemoria || this.activeSection === 'simbolo');
+      // Ocultar las partículas que caen de arriba a abajo en Agujero Negro, Memoria Natural, El Símbolo, El Manifiesto y Press Kit
+      const isHiddenSpiral = (isMemoria || this.activeSection === 'simbolo' || this.activeSection === 'manifiesto' || this.activeSection === 'press-kit');
       if (this.spiralSystem) {
         this.spiralSystem.visible = !isHiddenSpiral;
       }
@@ -1562,6 +1780,14 @@ export class SimbiotikWebGL {
         this.memoriaZSpin = (this.memoriaZSpin || 0) + 0.003;
       } else {
         this.memoriaZSpin = 0;
+      }
+
+      // Giro continuo alrededor del eje Y en la sección Press Kit
+      const isPressKit = (this.activeSection === 'press-kit');
+      if (isPressKit) {
+        this.pressKitYSpin = (this.pressKitYSpin || 0) + (this.logoSpinSpeed || 0.008);
+      } else {
+        this.pressKitYSpin = 0;
       }
 
       const isSimbolo = (this.activeSection === 'simbolo');
@@ -1582,7 +1808,7 @@ export class SimbiotikWebGL {
       this.currentLogoRotZ += (targetRotZ - this.currentLogoRotZ) * 0.05;
       this.currentLogoScaleZ += (targetScaleZ - this.currentLogoScaleZ) * 0.05;
 
-      this.logoGroup.rotation.y = baseRotY + this.currentLogoRotYOffset;
+      this.logoGroup.rotation.y = baseRotY + this.currentLogoRotYOffset + this.pressKitYSpin;
       this.logoGroup.rotation.x = this.currentLogoRotX;
       this.logoGroup.rotation.z = this.currentLogoRotZ + this.memoriaZSpin;
       this.logoGroup.scale.set(1.0, 1.0, this.currentLogoScaleZ);
@@ -1610,25 +1836,28 @@ export class SimbiotikWebGL {
         simbiosisTitle.style.opacity = opacity;
       }
 
-      // Calcular la posición del centro magnético de la sección Memoria Natural
+      // Calcular el desvanecimiento del Agujero Negro al entrar y estar en Memoria Natural
       const memoriaSec = document.getElementById('memoria-natural');
-      let memoriaCenterProgress = 1.0; // 1.0 fuera del centro (visible), 0.0 en el centro magnético (desaparecen totalmente)
+      let memoriaCenterProgress = 1.0; // 1.0 visible, 0.0 totalmente desvanecido
 
       if (memoriaSec) {
         const rect = memoriaSec.getBoundingClientRect();
         const vh = window.innerHeight;
-        const sectionCenterY = rect.top + Math.min(rect.height, vh) / 2.0;
-        const viewportCenterY = vh / 2.0;
-        const distFromCenter = Math.abs(sectionCenterY - viewportCenterY);
-        const deadZone = 30.0; // Rango extendido 30px arriba y 30px abajo (60px total) donde permanece 100% desaparecido
-        const fadeRadius = vh * 0.55;
+        const fadeZone = Math.min(250, vh * 0.3);
 
-        if (distFromCenter <= deadZone) {
+        if (rect.top <= vh && rect.top > vh - fadeZone) {
+          // Entrada: desvanecimiento suave al ingresar totalmente a la sección Memoria Natural
+          const t = (rect.top - (vh - fadeZone)) / fadeZone;
+          memoriaCenterProgress = 0.5 - 0.5 * Math.cos(t * Math.PI);
+        } else if (rect.top <= vh - fadeZone && rect.bottom >= fadeZone) {
+          // Cuerpo principal: PERMANECE 100% OCULTO (opacidad 0)
           memoriaCenterProgress = 0.0;
-        } else if (distFromCenter < fadeRadius) {
-          const normDist = (distFromCenter - deadZone) / (fadeRadius - deadZone);
-          // Curva coseno (0.0 en el rango desvanecido -> 1.0 al alejarse arriba o abajo)
-          memoriaCenterProgress = 0.5 - 0.5 * Math.cos(normDist * Math.PI);
+        } else if (rect.bottom < fadeZone && rect.bottom > 0) {
+          // Salida: reaparece progresivamente al tocar el borde inferior de Memoria Natural
+          const t = (fadeZone - rect.bottom) / fadeZone;
+          memoriaCenterProgress = 0.5 - 0.5 * Math.cos(t * Math.PI);
+        } else if (rect.top > vh || rect.bottom <= 0) {
+          memoriaCenterProgress = 1.0;
         }
       }
 
@@ -1645,9 +1874,58 @@ export class SimbiotikWebGL {
         }
       }
 
+      // Calcular el desvanecimiento gradual del Logotipo 3D al acercarse al centro magnético de Memoria Natural
+      let logoCenterProgress = 1.0;
+      if (memoriaSec) {
+        const container = memoriaSec.querySelector('.container') || memoriaSec;
+        const rect = container.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const sectionCenterY = rect.top + rect.height / 2.0;
+        const magneticCenterY = vh / 2.0 + 55;
+        const distFromCenter = Math.abs(sectionCenterY - magneticCenterY);
+        const deadZone = 30.0; // Rango al centro magnético donde desaparece por completo (opacidad 0)
+        const fadeRadius = vh * 0.5;
+
+        if (distFromCenter <= deadZone) {
+          logoCenterProgress = 0.0;
+        } else if (distFromCenter < fadeRadius) {
+          const normDist = (distFromCenter - deadZone) / (fadeRadius - deadZone);
+          // Curva coseno de desvanecimiento gradual al acercarse y reaparición gradual al bajar el scroll
+          logoCenterProgress = 0.5 - 0.5 * Math.cos(normDist * Math.PI);
+        }
+      }
+
+      // Calcular desvanecimiento gradual del Logotipo 3D al entrar, estar y salir de la sección Manifiesto
+      const manifiestoSec = document.getElementById('manifiesto');
+      let manifiestoFadeProgress = 1.0;
+
+      if (manifiestoSec) {
+        const rect = manifiestoSec.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const fadeZone = Math.min(350, vh * 0.45);
+
+        if (rect.top < vh && rect.top > vh - fadeZone) {
+          // Entrada a Manifiesto desvaneciéndose progresivamente de 1.0 a 0.0
+          const t = (rect.top - (vh - fadeZone)) / fadeZone;
+          manifiestoFadeProgress = 0.5 - 0.5 * Math.cos(t * Math.PI);
+        } else if (rect.top <= vh - fadeZone && rect.bottom >= fadeZone) {
+          // Ocultar totalmente dentro de la sección Manifiesto
+          manifiestoFadeProgress = 0.0;
+        } else if (rect.bottom < fadeZone && rect.bottom > 0) {
+          // Salida de Manifiesto reapareciendo progresivamente de 0.0 a 1.0
+          const t = (fadeZone - rect.bottom) / fadeZone;
+          manifiestoFadeProgress = 0.5 - 0.5 * Math.cos(t * Math.PI);
+        } else {
+          manifiestoFadeProgress = 1.0;
+        }
+      }
+
+      // Opacidad combinada final del logotipo 3D
+      const combinedLogoProgress = Math.min(logoCenterProgress, manifiestoFadeProgress);
+
       // Aplicar visibilidad y opacidad al Logotipo 3D
       if (this.logoGroup) {
-        this.logoGroup.visible = (memoriaCenterProgress > 0.001);
+        this.logoGroup.visible = this.isLogoVisible && (combinedLogoProgress > 0.001);
 
         // Actualizar propiedades físicas del material para fundir a metal cromo brillante
         this.logoGroup.traverse((child) => {
@@ -1660,7 +1938,7 @@ export class SimbiotikWebGL {
               mat.roughness = 0.1 * goldFactor + 0.0 * (1.0 - goldFactor); // 0.1 para reflejos satinados metálicos suaves
               mat.clearcoat = goldFactor * 1.0; // Capa de laca brillante líquida
               mat.clearcoatRoughness = 0.02; // Reflejo secundario nítido
-              mat.opacity = (0.4 + goldFactor * 0.6) * memoriaCenterProgress; // Desaparece al 0% en el centro magnético
+              mat.opacity = (0.4 + goldFactor * 0.6) * combinedLogoProgress; // Desaparece al 0% en Manifiesto y centro magnético
               mat.transparent = true;
               mat.thickness = 2.5 * (1.0 - goldFactor);
               
@@ -1670,6 +1948,39 @@ export class SimbiotikWebGL {
             }
           }
         });
+      }
+
+      // Modelo 3D Slender Woman: únicamente activo en la sección Manifiesto, oculto en Press Kit y demás secciones
+      const isManifiestoOnly = (this.activeSection === 'manifiesto');
+      const slenderOpacityProgress = 1.0 - manifiestoFadeProgress;
+
+      if (this.slenderWomanGroup) {
+        this.slenderWomanGroup.visible = isManifiestoOnly && (slenderOpacityProgress > 0.001);
+        if (this.slenderWomanGroup.visible) {
+          // Rotación sutil y fluida sobre el eje Y
+          this.slenderWomanGroup.rotation.y += 0.003;
+        }
+
+        if (this.slenderWomanMesh) {
+          const slenderColor = new THREE.Color("#b87fbc");
+          this.slenderWomanMesh.traverse((child) => {
+            if (child.isMesh && child.material) {
+              child.material.opacity = isManifiestoOnly ? (0.85 * slenderOpacityProgress) : 0;
+              child.material.transparent = true;
+              child.material.color.copy(slenderColor);
+            }
+          });
+        }
+      }
+
+      // Vórtice giratorio de líneas de código azul en la base del modelo 3D en El Manifiesto
+      if (this.codeVortexGroup && this.codeVortexMaterial) {
+        this.codeVortexGroup.visible = (slenderOpacityProgress > 0.001);
+        if (this.codeVortexGroup.visible) {
+          this.codeVortexMaterial.uniforms.uTime.value += 0.016;
+          this.codeVortexMaterial.uniforms.uVortexOpacity.value = slenderOpacityProgress;
+          this.codeVortexGroup.rotation.z += 0.004; // Giro helicoidal constante del vórtice de código
+        }
       }
     }
     

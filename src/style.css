@@ -121,6 +121,13 @@ body.section-memoria-natural #waves-canvas {
   z-index: 1;
   pointer-events: none;
   opacity: 0.8;
+  transition: opacity 0.6s ease;
+}
+
+body.section-memoria-intro .tech-grid,
+body.section-manifiesto .tech-grid,
+body.section-press-kit .tech-grid {
+  opacity: 0 !important;
 }
 
 .scanlines {
@@ -1164,12 +1171,30 @@ body.section-memoria-natural #waves-canvas {
   font-weight: 300;
 }
 
-/* PRESS KIT SECTION */
+/* PRESS KIT SECTION - ALINEACIÓN EXACTA CON LA PALABRA SIMBIOTIK EN EL HEADER */
+#press-kit .container {
+  margin-left: max(48px, calc((100vw - 1400px) / 2 + 48px)) !important;
+  margin-right: auto !important;
+  max-width: 580px;
+  text-align: left;
+  padding-left: 0 !important;
+}
+
+#press-kit .section-header {
+  text-align: left !important;
+}
+
+#press-kit .section-header .section-desc {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  text-align: left;
+}
+
 .press-grid {
   display: flex;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 60px;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-top: 40px;
 }
 
 .member-card {
@@ -1389,6 +1414,11 @@ a .glitch-char {
 
 /* RESPONSIVE DESIGN */
 @media (max-width: 968px) {
+  #press-kit .container {
+    margin-left: 24px !important;
+    max-width: calc(100% - 48px);
+  }
+
   .navbar {
     padding: 20px 24px;
   }
