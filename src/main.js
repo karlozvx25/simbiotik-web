@@ -6,10 +6,10 @@ import { tracks } from './audio.js';
 import gsap from 'gsap';
 
 document.addEventListener('DOMContentLoaded', () => {
-  
+
   // 1. INICIALIZAR WEBGL CANVAS
   const webgl = new SimbiotikWebGL();
-  
+
   // Carga del modelo 3D GLTF/GLB en formato Cromo Azul
   webgl.loadLogoModel('/smbtk1.glb');
 
@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const cursor = document.createElement('div');
   cursor.className = 'custom-cursor';
   document.body.appendChild(cursor);
-  
+
   document.addEventListener('mousemove', (e) => {
     gsap.to(cursor, {
       x: e.clientX,
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateHoverEffects();
   });
   domObserver.observe(document.body, { childList: true, subtree: true });
-  
+
   // 2. INICIALIZAR SCROLL SUAVE (LENIS)
   const lenis = new Lenis({
     duration: 1.2,
@@ -123,57 +123,60 @@ document.addEventListener('DOMContentLoaded', () => {
   // Escuchar redimensionamiento de pantalla para recalcular posiciones de scroll
   window.addEventListener('resize', updateSidebarState);
 
-  // Helper unificado para obtener el scroll Y exacto del centro magnético de cada sección
+  // Helper dinámico y resiliente para calcular el centro magnético absoluto de cualquier sección
   const getTargetScrollForSection = (section) => {
     if (!section) return 0;
 
-    // Calcular posición absoluta en el documento libre de fluctuaciones durante el scroll
-    let sectionTop = 0;
-    let curr = section;
-    while (curr) {
-      sectionTop += curr.offsetTop;
-      curr = curr.offsetParent;
-    }
-
-    const sectionHeight = section.offsetHeight;
-    const viewportHeight = window.innerHeight;
+    const currentScrollY = window.scrollY;
+    const vh = window.innerHeight;
     const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 60;
 
-    // 1. Inicio (Hero)
+    // 1. Hero / Inicio (Tope absoluto de pantalla)
     if (section.id === 'inicio') {
       return 0;
     }
 
     // 2. Simbiosis Sonido
     if (section.id === 'simbiosis-sonido') {
-      return Math.max(0, sectionTop + (sectionHeight > viewportHeight ? viewportHeight : sectionHeight / 2 - viewportHeight / 2));
+      const rect = section.getBoundingClientRect();
+      const absTop = currentScrollY + rect.top;
+      return Math.max(0, absTop + (rect.height > vh ? vh : rect.height / 2 - vh / 2));
     }
 
     // 3. Agujero Negro (memoria-intro): centro magnético anterior (-20px offset)
     if (section.id === 'memoria-intro') {
-      return Math.max(0, sectionTop - 20);
+      const rect = section.getBoundingClientRect();
+      const absTop = currentScrollY + rect.top;
+      return Math.max(0, absTop - 20);
     }
 
-    // 4. Memoria Natural: última configuración (-70px offset)
+    // 4. Memoria Natural: centro magnético subido 40px (-40px offset)
     if (section.id === 'memoria-natural') {
-      return Math.max(0, sectionTop + sectionHeight / 2 - viewportHeight / 2 - 70);
+      const container = section.querySelector('.container') || section;
+      const rect = container.getBoundingClientRect();
+      const absTop = currentScrollY + rect.top;
+      return Math.max(0, absTop + rect.height / 2 - vh / 2 - 55);
     }
 
-    // 5. El Símbolo: centro magnético vertical (-5px offset)
-    if (section.id === 'simbolo') {
-      return Math.max(0, sectionTop + sectionHeight / 2 - viewportHeight / 2 - 5);
-    }
-
-    // 6. Manifiesto: alineación de cabecera debajo de la barra de navegación
+    // 5. Manifiesto (Alineado debajo de la barra de navegación)
     if (section.id === 'manifiesto') {
       const techSubtitle = section.querySelector('.tech-subtitle');
       if (techSubtitle) {
-        return Math.max(0, sectionTop + techSubtitle.offsetTop - navbarHeight - 20);
+        const subRect = techSubtitle.getBoundingClientRect();
+        return Math.max(0, currentScrollY + subRect.top - navbarHeight - 20);
       }
     }
 
-    // Caso Estándar: centrado vertical exacto de la sección respecto al viewport
-    return Math.max(0, sectionTop + sectionHeight / 2 - viewportHeight / 2);
+    // 4. Secciones Generales (Agujero Negro, Memoria Natural, El Símbolo, Press Kit, Contacto, etc.)
+    // Calculamos el centro visual real del contenido de la sección para encuadrarlo en el centro exacto del viewport
+    const contentElement = section.querySelector('.container') || section.querySelector('.symbol-text-panel') || section;
+    const contentRect = contentElement.getBoundingClientRect();
+    const contentAbsTop = currentScrollY + contentRect.top;
+
+    // Fórmula universal: scroll necesario para que el centro del contenido quede exactamente a vh / 2
+    const idealScroll = contentAbsTop + contentRect.height / 2 - vh / 2;
+
+    return Math.max(0, idealScroll);
   };
 
   function raf(time) {
@@ -187,15 +190,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const scramblers = Array.from(scrambleElements).map(el => {
     const sc = new TextScramble(el);
     const originalText = el.getAttribute('data-text') || el.innerText;
-    
+
     // Scramble inicial
     sc.setText(originalText);
-    
+
     // Activar scramble al pasar el mouse (hover)
     el.addEventListener('mouseenter', () => {
       sc.setText(originalText);
     });
-    
+
     return { el, sc, originalText };
   });
 
@@ -203,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const act1Container = document.getElementById('act-1-tracks');
   const act2Container = document.getElementById('act-2-tracks');
   const act3Container = document.getElementById('act-3-tracks');
-  
+
   let currentTrackIndex = 0;
 
   function renderTracklist() {
@@ -211,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const row = document.createElement('div');
       row.className = `track-row ${index === currentTrackIndex ? 'active' : ''}`;
       row.setAttribute('data-index', index);
-      
+
       row.innerHTML = `
         <div class="row-left">
           <span class="track-row-num">${String(track.id).padStart(2, '0')}</span>
@@ -228,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </button>
         </div>
       `;
-      
+
       // Añadir fila al contenedor correspondiente según su acto
       if (track.actNumber === 1) {
         act1Container.appendChild(row);
@@ -254,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const playerTrackTerritory = document.getElementById('player-track-territory');
   const playerTrackMood = document.getElementById('player-track-mood');
   const playerTrackQuote = document.getElementById('player-track-quote');
-  
+
   const activeTrackScrambler = new TextScramble(playerTrackTitle);
 
   function selectTrack(index) {
@@ -262,21 +265,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.track-row').forEach(row => {
       row.classList.remove('active');
     });
-    
+
     currentTrackIndex = index;
     const track = tracks[currentTrackIndex];
-    
+
     // Activar fila actual
     const activeRow = document.querySelector(`.track-row[data-index="${index}"]`);
     if (activeRow) activeRow.classList.add('active');
-    
+
     // Cambiar datos del panel izquierdo
     playerActNum.innerText = track.actNumber === 1 ? 'I' : track.actNumber === 2 ? 'II' : 'III';
     playerActTitle.innerText = track.act;
     playerTrackTerritory.innerText = track.territory;
     playerTrackMood.innerText = track.mood;
     playerTrackQuote.innerText = `"${track.corePhrase}"`;
-    
+
     // Efecto text scramble sobre el título de la canción seleccionada
     activeTrackScrambler.setText(track.title);
 
@@ -286,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Cargar primera canción al inicio
   selectTrack(0);
-  
+
   // Forzar el tema de color a Azul Frecuencia al inicio (para recrear el efecto de la esfera)
   webgl.updateColorTheme('#38bdf8');
 
@@ -321,11 +324,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   partCards.forEach(card => {
     const partName = card.getAttribute('data-part');
-    
+
     card.addEventListener('mouseenter', () => {
       highlightPart(partName);
     });
-    
+
     card.addEventListener('mouseleave', () => {
       clearHighlight();
     });
@@ -334,13 +337,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function highlightPart(partName) {
     // Apagar todos
     partCards.forEach(c => c.classList.remove('hover'));
-    
+
     // Encender tarjeta correspondiente
     const card = document.getElementById(`part-${partName}`);
     if (card) {
       card.classList.add('hover');
     }
-    
+
     // En WebGL, podemos cambiar el foco de la cámara levemente o iluminar el área del shader
     // según el hotspot. Ejemplo:
     if (partName === 'core') {
@@ -367,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (contactForm) {
     contactForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      
+
       // Animación de salida del formulario
       gsap.to(contactForm, {
         opacity: 0,
@@ -376,13 +379,13 @@ document.addEventListener('DOMContentLoaded', () => {
         onComplete: () => {
           contactForm.classList.add('hidden');
           contactSuccess.classList.remove('hidden');
-          
+
           // Animación de entrada de la confirmación
-          gsap.fromTo(contactSuccess, 
+          gsap.fromTo(contactSuccess,
             { opacity: 0, scale: 0.95 },
             { opacity: 1, scale: 1, duration: 0.5 }
           );
-          
+
           // Glitch sónico en WebGL al enviar exitosamente la señal
           webgl.updateColorTheme("#ffffff");
           setTimeout(() => {
@@ -397,7 +400,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const menuToggle = document.querySelector('.menu-toggle');
   const mobileMenu = document.querySelector('.mobile-menu');
   const sections = document.querySelectorAll('.section-pane');
-  
+
+  // Tag de la cabecera a la derecha del logo SIMBIOTIK
+  const headerTechTag = document.querySelector('.header-tech-tag');
+  const headerTagScrambler = headerTechTag ? new TextScramble(headerTechTag) : null;
+
+  const sectionTagMap = {
+    'inicio': '[ FRECUENCIA ACTIVA ]',
+    'simbiosis-sonido': '[ SIMBIOSIS ]',
+    'memoria-intro': '[ AGUJERO NEGRO ]',
+    'memoria-natural': '[ MEMORIA NATURAL ]',
+    'simbolo': '[ NÚCLEO REVELADO ]',
+    'manifiesto': '[ MANIFIESTO ]',
+    'press-kit': '[ PRESS KIT ]',
+    'contacto': '[ CONTACTO ]'
+  };
+
   // Mapa de secciones a estados y colores
   const sectionStateMap = {
     'inicio': { state: 'idle', color: '#38bdf8' },
@@ -423,20 +441,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (entry.isIntersecting) {
         // Añadir clase visible para animar opacidad y posición en CSS
         entry.target.classList.add('visible');
-        
+
         const sectionId = entry.target.id;
-        
+
         // No repetir si ya es la misma sección activa
         if (sectionId === lastActiveSection) return;
         lastActiveSection = sectionId;
-        
+
         // Actualizar clase de sección activa en document.body para controlar z-index CSS
         document.body.className = document.body.className.replace(/\bsection-[\w-]+\b/g, '').trim();
         document.body.classList.add(`section-${sectionId}`);
 
         // Mover cámara WebGL según la sección activa en el scroll
         webgl.triggerSectionTransition(sectionId);
-        
+
         // Ocultar retícula técnica (.tech-grid) únicamente en la sección Agujero Negro (memoria-intro)
         const techGrid = document.querySelector('.tech-grid');
         if (techGrid) {
@@ -456,13 +474,23 @@ document.addEventListener('DOMContentLoaded', () => {
             l.classList.add('active');
           }
         });
-        
+
         // Cambiar color del logo 3D si corresponde
         const sectionMap = sectionStateMap[sectionId];
         if (sectionMap) {
           webgl.updateColorTheme(sectionMap.color);
         }
-        
+
+        // Actualizar el tag tecnológico del header a la derecha del logo SIMBIOTIK con efecto scramble
+        if (headerTechTag && sectionTagMap[sectionId]) {
+          const newTagText = sectionTagMap[sectionId];
+          if (headerTagScrambler) {
+            headerTagScrambler.setText(newTagText);
+          } else {
+            headerTechTag.innerText = newTagText;
+          }
+        }
+
         // Mostrar/ocultar SVG overlay y logo 3D en la sección Símbolo
         const svgOverlay = document.getElementById('logo-svg-overlay');
         if (sectionId === 'simbolo') {
@@ -486,15 +514,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 9.5 NAVEGACIÓN POR CLICS (LENIS SCROLL)
   const navLinks = document.querySelectorAll('.mobile-menu a, .header-buttons a, .hero-sidebar-links a');
-  
+
   navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      
+
       const targetId = link.getAttribute('href');
       const targetSection = document.querySelector(targetId);
       if (!targetSection) return;
-      
+
       // Cerrar menú móvil si está abierto
       if (mobileMenu) {
         mobileMenu.classList.remove('active');
@@ -502,14 +530,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (menuToggle) {
         menuToggle.classList.remove('open');
       }
-      
+
       // Hacer scroll suave hacia la sección
       if (targetSection) targetSection.classList.add('visible');
 
       isNavigating = true;
 
       const targetY = getTargetScrollForSection(targetSection);
-      lenis.scrollTo(targetY, { 
+      lenis.scrollTo(targetY, {
         duration: 1.5,
         onComplete: () => {
           setTimeout(() => { isNavigating = false; }, 100);
@@ -553,7 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Evitar micro-ajustes si ya está casi perfectamente centrado
       if (Math.abs(targetY - scrollY) > 8) {
         isSnapping = true;
-        
+
         // Forzar visibilidad
         nearestSection.classList.add('visible');
 
