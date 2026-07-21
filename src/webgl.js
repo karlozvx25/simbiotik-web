@@ -1610,25 +1610,28 @@ export class SimbiotikWebGL {
         simbiosisTitle.style.opacity = opacity;
       }
 
-      // Calcular la posición del centro magnético de la sección Memoria Natural
+      // Calcular el desvanecimiento del Agujero Negro al entrar y estar en Memoria Natural
       const memoriaSec = document.getElementById('memoria-natural');
-      let memoriaCenterProgress = 1.0; // 1.0 fuera del centro (visible), 0.0 en el centro magnético (desaparecen totalmente)
+      let memoriaCenterProgress = 1.0; // 1.0 visible, 0.0 totalmente desvanecido
 
       if (memoriaSec) {
         const rect = memoriaSec.getBoundingClientRect();
         const vh = window.innerHeight;
-        const sectionCenterY = rect.top + Math.min(rect.height, vh) / 2.0;
-        const viewportCenterY = vh / 2.0;
-        const distFromCenter = Math.abs(sectionCenterY - viewportCenterY);
-        const deadZone = 30.0; // Rango extendido 30px arriba y 30px abajo (60px total) donde permanece 100% desaparecido
-        const fadeRadius = vh * 0.55;
+        const fadeZone = Math.min(250, vh * 0.3);
 
-        if (distFromCenter <= deadZone) {
+        if (rect.top <= vh && rect.top > vh - fadeZone) {
+          // Entrada: desvanecimiento suave al ingresar totalmente a la sección Memoria Natural
+          const t = (rect.top - (vh - fadeZone)) / fadeZone;
+          memoriaCenterProgress = 0.5 - 0.5 * Math.cos(t * Math.PI);
+        } else if (rect.top <= vh - fadeZone && rect.bottom >= fadeZone) {
+          // Cuerpo principal: PERMANECE 100% OCULTO (opacidad 0)
           memoriaCenterProgress = 0.0;
-        } else if (distFromCenter < fadeRadius) {
-          const normDist = (distFromCenter - deadZone) / (fadeRadius - deadZone);
-          // Curva coseno (0.0 en el rango desvanecido -> 1.0 al alejarse arriba o abajo)
-          memoriaCenterProgress = 0.5 - 0.5 * Math.cos(normDist * Math.PI);
+        } else if (rect.bottom < fadeZone && rect.bottom > 0) {
+          // Salida: reaparece progresivamente al tocar el borde inferior de Memoria Natural
+          const t = (fadeZone - rect.bottom) / fadeZone;
+          memoriaCenterProgress = 0.5 - 0.5 * Math.cos(t * Math.PI);
+        } else if (rect.top > vh || rect.bottom <= 0) {
+          memoriaCenterProgress = 1.0;
         }
       }
 
@@ -1645,9 +1648,30 @@ export class SimbiotikWebGL {
         }
       }
 
+      // Calcular el desvanecimiento gradual del Logotipo 3D al acercarse al centro magnético de Memoria Natural
+      let logoCenterProgress = 1.0;
+      if (memoriaSec) {
+        const container = memoriaSec.querySelector('.container') || memoriaSec;
+        const rect = container.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const sectionCenterY = rect.top + rect.height / 2.0;
+        const magneticCenterY = vh / 2.0 + 55;
+        const distFromCenter = Math.abs(sectionCenterY - magneticCenterY);
+        const deadZone = 30.0; // Rango al centro magnético donde desaparece por completo (opacidad 0)
+        const fadeRadius = vh * 0.5;
+
+        if (distFromCenter <= deadZone) {
+          logoCenterProgress = 0.0;
+        } else if (distFromCenter < fadeRadius) {
+          const normDist = (distFromCenter - deadZone) / (fadeRadius - deadZone);
+          // Curva coseno de desvanecimiento gradual al acercarse y reaparición gradual al bajar el scroll
+          logoCenterProgress = 0.5 - 0.5 * Math.cos(normDist * Math.PI);
+        }
+      }
+
       // Aplicar visibilidad y opacidad al Logotipo 3D
       if (this.logoGroup) {
-        this.logoGroup.visible = (memoriaCenterProgress > 0.001);
+        this.logoGroup.visible = this.isLogoVisible && (logoCenterProgress > 0.001);
 
         // Actualizar propiedades físicas del material para fundir a metal cromo brillante
         this.logoGroup.traverse((child) => {
@@ -1660,7 +1684,7 @@ export class SimbiotikWebGL {
               mat.roughness = 0.1 * goldFactor + 0.0 * (1.0 - goldFactor); // 0.1 para reflejos satinados metálicos suaves
               mat.clearcoat = goldFactor * 1.0; // Capa de laca brillante líquida
               mat.clearcoatRoughness = 0.02; // Reflejo secundario nítido
-              mat.opacity = (0.4 + goldFactor * 0.6) * memoriaCenterProgress; // Desaparece al 0% en el centro magnético
+              mat.opacity = (0.4 + goldFactor * 0.6) * logoCenterProgress; // Desaparece al 0% en el centro magnético y reaparece al alejarse
               mat.transparent = true;
               mat.thickness = 2.5 * (1.0 - goldFactor);
               
