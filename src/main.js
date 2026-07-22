@@ -320,15 +320,31 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   const manifestoContainer = document.getElementById('manifiesto-items-container');
-  manifestoItems.forEach((item) => {
-    const card = document.createElement('div');
-    card.className = 'manifiesto-card glass-panel';
-    card.innerHTML = `
-      <span class="manifiesto-keyword">${item.keyword}</span>
-      <p class="manifiesto-text">${item.text}</p>
-    `;
-    manifestoContainer.appendChild(card);
-  });
+  if (manifestoContainer) {
+    manifestoContainer.innerHTML = '';
+    const leftCol = document.createElement('div');
+    leftCol.className = 'manifiesto-col manifiesto-col-left';
+
+    const rightCol = document.createElement('div');
+    rightCol.className = 'manifiesto-col manifiesto-col-right';
+
+    manifestoItems.forEach((item, index) => {
+      const card = document.createElement('div');
+      card.className = 'manifiesto-card glass-panel';
+      card.innerHTML = `
+        <span class="manifiesto-keyword">${item.keyword}</span>
+        <p class="manifiesto-text">${item.text}</p>
+      `;
+      if (index < 5) {
+        leftCol.appendChild(card);
+      } else {
+        rightCol.appendChild(card);
+      }
+    });
+
+    manifestoContainer.appendChild(leftCol);
+    manifestoContainer.appendChild(rightCol);
+  }
 
   // 6. INTERACCIONES DEL SÍMBOLO (HOTSPOTS)
   const partCards = document.querySelectorAll('.part-card');
@@ -412,8 +428,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const mobileMenu = document.querySelector('.mobile-menu');
   const sections = document.querySelectorAll('.section-pane');
 
-  // Tag de la cabecera a la derecha del logo SIMBIOTIK
-  const headerTechTag = document.querySelector('.header-tech-tag');
+  // Tag auxiliar dinámico junto al logo SIMBIOTIK en el header
+  const headerTechTag = document.getElementById('header-tech-tag');
   const headerTagScrambler = headerTechTag ? new TextScramble(headerTechTag) : null;
 
   const sectionTagMap = {
@@ -422,10 +438,29 @@ document.addEventListener('DOMContentLoaded', () => {
     'memoria-intro': '[ AGUJERO NEGRO ]',
     'memoria-natural': '[ MEMORIA NATURAL ]',
     'simbolo': '[ NÚCLEO REVELADO ]',
+    'dimension-alterna': '[ DIMENSIÓN ALTERNA ]',
     'manifiesto': '[ MANIFIESTO ]',
     'press-kit': '[ PRESS KIT ]',
     'contacto': '[ CONTACTO ]'
   };
+
+  function showHeaderTechTag(text) {
+    if (!headerTechTag) return;
+    if (headerTagScrambler) {
+      headerTagScrambler.setText(text);
+    } else {
+      headerTechTag.innerText = text;
+    }
+    headerTechTag.classList.add('visible');
+
+    if (window.headerTechTimeout) clearTimeout(window.headerTechTimeout);
+    window.headerTechTimeout = setTimeout(() => {
+      headerTechTag.classList.remove('visible');
+    }, 2000);
+  }
+
+  // Mostrar "[ FRECUENCIA ACTIVA ]" al inicio en el Hero durante 2 segundos
+  showHeaderTechTag('[ FRECUENCIA ACTIVA ]');
 
   // Mapa de secciones a estados y colores
   const sectionStateMap = {
@@ -434,9 +469,10 @@ document.addEventListener('DOMContentLoaded', () => {
     'memoria-intro': { state: 'active', color: '#7f1d1d' },
     'memoria-natural': { state: 'active', color: '#0284c7' },
     'simbolo': { state: 'core', color: '#6d28d9' },
+    'dimension-alterna': { state: 'memory', color: '#888888' },
     'manifiesto': { state: 'memory', color: '#b88945' },
     'press-kit': { state: 'memory', color: '#b88945' },
-    'contacto': { state: 'signal', color: '#1e40af' }
+    'contacto': { state: 'signal', color: '#71717a' }
   };
 
   let lastActiveSection = null;
@@ -466,16 +502,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mover cámara WebGL según la sección activa en el scroll
         webgl.triggerSectionTransition(sectionId);
 
-        // Ocultar retícula técnica (.tech-grid) en las secciones Agujero Negro (memoria-intro), El Manifiesto (manifiesto) y Press Kit (press-kit)
-        const techGrid = document.querySelector('.tech-grid');
-        if (techGrid) {
-          techGrid.style.transition = 'opacity 0.6s ease';
-          if (sectionId === 'memoria-intro' || sectionId === 'manifiesto' || sectionId === 'press-kit') {
-            techGrid.style.opacity = '0';
-          } else {
-            techGrid.style.opacity = '1';
-          }
-        }
 
         // Actualizar menú activo en el menú lateral del hero
         document.querySelectorAll('.hero-sidebar-links a').forEach(l => {
@@ -491,14 +517,9 @@ document.addEventListener('DOMContentLoaded', () => {
           webgl.updateColorTheme(sectionMap.color);
         }
 
-        // Actualizar el tag tecnológico del header a la derecha del logo SIMBIOTIK con efecto scramble
-        if (headerTechTag && sectionTagMap[sectionId]) {
-          const newTagText = sectionTagMap[sectionId];
-          if (headerTagScrambler) {
-            headerTagScrambler.setText(newTagText);
-          } else {
-            headerTechTag.innerText = newTagText;
-          }
+        // Mostrar tag auxiliar con estilo azul y desvanecimiento tras 2 segundos al navegar a cada sección
+        if (sectionTagMap[sectionId]) {
+          showHeaderTechTag(sectionTagMap[sectionId]);
         }
 
         // Mostrar/ocultar SVG overlay y logo 3D en la sección Símbolo
