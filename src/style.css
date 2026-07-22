@@ -1384,6 +1384,10 @@ body.section-memoria-natural #waves-canvas {
 }
 
 /* CONTACTO SECTION */
+#contacto {
+  padding-bottom: 120px;
+}
+
 .contact-form-container {
   padding: 40px;
   margin-top: 60px;

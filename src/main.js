@@ -130,64 +130,62 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentScrollY = window.scrollY;
     const vh = window.innerHeight;
     const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 60;
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh);
+
+    let targetY = 0;
 
     // 1. Hero / Inicio (Tope absoluto de pantalla)
     if (section.id === 'inicio') {
-      return 0;
+      targetY = 0;
     }
-
     // 2. Simbiosis Sonido
-    if (section.id === 'simbiosis-sonido') {
+    else if (section.id === 'simbiosis-sonido') {
       const rect = section.getBoundingClientRect();
       const absTop = currentScrollY + rect.top;
-      return Math.max(0, absTop + (rect.height > vh ? vh : rect.height / 2 - vh / 2));
+      targetY = Math.max(0, absTop + (rect.height > vh ? vh : rect.height / 2 - vh / 2));
     }
-
     // 3. Agujero Negro (memoria-intro): centro magnético anterior (-20px offset)
-    if (section.id === 'memoria-intro') {
+    else if (section.id === 'memoria-intro') {
       const rect = section.getBoundingClientRect();
       const absTop = currentScrollY + rect.top;
-      return Math.max(0, absTop - 20);
+      targetY = Math.max(0, absTop - 20);
     }
-
     // 4. Memoria Natural: centro magnético subido 40px (-40px offset)
-    if (section.id === 'memoria-natural') {
+    else if (section.id === 'memoria-natural') {
       const container = section.querySelector('.container') || section;
       const rect = container.getBoundingClientRect();
       const absTop = currentScrollY + rect.top;
-      return Math.max(0, absTop + rect.height / 2 - vh / 2 - 55);
+      targetY = Math.max(0, absTop + rect.height / 2 - vh / 2 - 55);
     }
-
     // 5. El Manifiesto: centro magnético alineado al encabezado y barra de navegación
-    if (section.id === 'manifiesto') {
+    else if (section.id === 'manifiesto') {
       const techSubtitle = section.querySelector('.tech-subtitle');
       if (techSubtitle) {
         const subRect = techSubtitle.getBoundingClientRect();
-        return Math.max(0, currentScrollY + subRect.top - navbarHeight - 20);
+        targetY = Math.max(0, currentScrollY + subRect.top - navbarHeight - 20);
+      } else {
+        const container = section.querySelector('.container') || section;
+        const rect = container.getBoundingClientRect();
+        targetY = Math.max(0, currentScrollY + rect.top);
       }
-      const container = section.querySelector('.container') || section;
-      const rect = container.getBoundingClientRect();
-      return Math.max(0, currentScrollY + rect.top);
     }
-
     // 6. Press Kit: centro magnético dedicado para encuadrar perfectamente el contenido
-    if (section.id === 'press-kit') {
+    else if (section.id === 'press-kit') {
       const container = section.querySelector('.container') || section;
       const rect = container.getBoundingClientRect();
       const absTop = currentScrollY + rect.top;
-      return Math.max(0, absTop + rect.height / 2 - vh / 2 - 25);
+      targetY = Math.max(0, absTop + rect.height / 2 - vh / 2 - 25);
+    }
+    // 7. Contacto o Secciones Generales
+    else {
+      const contentElement = section.querySelector('.container') || section.querySelector('.symbol-text-panel') || section;
+      const contentRect = contentElement.getBoundingClientRect();
+      const contentAbsTop = currentScrollY + contentRect.top;
+      const idealScroll = contentAbsTop + contentRect.height / 2 - vh / 2;
+      targetY = Math.max(0, idealScroll);
     }
 
-    // 4. Secciones Generales (Agujero Negro, Memoria Natural, El Símbolo, Press Kit, Contacto, etc.)
-    // Calculamos el centro visual real del contenido de la sección para encuadrarlo en el centro exacto del viewport
-    const contentElement = section.querySelector('.container') || section.querySelector('.symbol-text-panel') || section;
-    const contentRect = contentElement.getBoundingClientRect();
-    const contentAbsTop = currentScrollY + contentRect.top;
-
-    // Fórmula universal: scroll necesario para que el centro del contenido quede exactamente a vh / 2
-    const idealScroll = contentAbsTop + contentRect.height / 2 - vh / 2;
-
-    return Math.max(0, idealScroll);
+    return Math.min(maxScroll, targetY);
   };
 
   function raf(time) {
@@ -585,8 +583,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 11. CENTRO MAGNÉTICO (SCROLL SNAPPING AUTOMÁTICO)
+  // 11. CENTRO MAGNÉTICO (SCROLL SNAPPING AUTOMÁTICO HABILITADO PERMANENTEMENTE)
   let snapTimeout = null;
+  let snapSafetyTimer = null;
 
   const performSnap = () => {
     if (isSnapping || isNavigating) return;
@@ -616,13 +615,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Forzar visibilidad
         nearestSection.classList.add('visible');
 
+        // Timer de resiliencia para que isSnapping nunca se quede bloqueado
+        if (snapSafetyTimer) clearTimeout(snapSafetyTimer);
+        snapSafetyTimer = setTimeout(() => {
+          isSnapping = false;
+        }, 1100);
+
         lenis.scrollTo(targetY, {
-          duration: 0.9,
+          duration: 0.8,
           easing: (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2, // easeInOutQuad
           onComplete: () => {
+            if (snapSafetyTimer) clearTimeout(snapSafetyTimer);
             setTimeout(() => {
               isSnapping = false;
-            }, 100);
+            }, 50);
           }
         });
       }
@@ -634,11 +640,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (snapTimeout) clearTimeout(snapTimeout);
 
-    // Cancelar si el sistema ya está realizando un snap o navegación programada
+    // Cancelar únicamente si el sistema está ejecutando una animación activa
     if (isSnapping || isNavigating) return;
 
-    // Activar inmediatamente el encuadre magnético al ralentizarse o soltar el scroll
-    if (Math.abs(e.velocity) < 0.6) {
+    // Detectar si se llegó o está muy cerca del final de la página
+    const scrollY = window.scrollY;
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const isNearEnd = (scrollY >= maxScroll - 20);
+
+    // Activar el encuadre magnético al ralentizarse o al llegar al extremo final de la página
+    if (Math.abs(e.velocity) < 0.6 || isNearEnd) {
       snapTimeout = setTimeout(performSnap, 100);
     }
   });
