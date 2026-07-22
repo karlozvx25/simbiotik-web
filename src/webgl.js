@@ -158,9 +158,9 @@ export class SimbiotikWebGL {
     this.canvas = document.getElementById('webgl-canvas');
     if (!this.canvas) return;
 
-    this.renderer = new THREE.WebGLRenderer({ 
-      canvas: this.canvas, 
-      antialias: true, 
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: true,
       alpha: true,
       powerPreference: "high-performance"
     });
@@ -168,16 +168,16 @@ export class SimbiotikWebGL {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
     this.scene = new THREE.Scene();
-    
+
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
     this.camera.position.z = 6;
 
     // Inicializar canvas secundario dedicado para la cuadrícula 3D de terreno (waves-canvas)
     this.wavesCanvas = document.getElementById('waves-canvas');
     if (this.wavesCanvas) {
-      this.wavesRenderer = new THREE.WebGLRenderer({ 
-        canvas: this.wavesCanvas, 
-        antialias: true, 
+      this.wavesRenderer = new THREE.WebGLRenderer({
+        canvas: this.wavesCanvas,
+        antialias: true,
         alpha: true,
         powerPreference: "high-performance"
       });
@@ -204,6 +204,7 @@ export class SimbiotikWebGL {
     this.logoParticleMode = false;
     this.slenderWomanMesh = null;
     this.slenderWomanGroup = null;
+    this.isSlenderHovered = false;
     this.activeSection = 'inicio';
     this.currentLogoRotX = 0;
 
@@ -214,6 +215,7 @@ export class SimbiotikWebGL {
     this.initGrass();
     this.initCodeVortex();
     this.loadSlenderWomanModel('/Slender_Woman_Lores.glb');
+    this.setupSlenderInteractions();
     this.bindEvents();
     this.animate();
   }
@@ -279,13 +281,13 @@ export class SimbiotikWebGL {
       positions[i * 3 + 1] = 0;
       positions[i * 3 + 2] = 0;
       indices[i] = i;
-      
+
       // Tamaño aleatorio variable (algunas pequeñas, medianas y burbujas grandes)
       sizeScales[i] = 0.2 + Math.random() * 2.3;
-      
+
       // Factor de mezcla de color para combinar Verde Aqua y Morado Neon
       colorFactors[i] = Math.random();
-      
+
       // Multiplicadores aleatorios para dar variedad orgánica al movimiento lento:
       randomOffsets[i * 3] = 0.7 + Math.random() * 0.6;     // Velocidad vertical
       randomOffsets[i * 3 + 1] = 0.5 + Math.random() * 1.0; // Velocidad de rotación
@@ -369,9 +371,9 @@ export class SimbiotikWebGL {
   initTunnel() {
     this.tunnelGroup = new THREE.Group();
     this.scene.add(this.tunnelGroup);
-    
+
     this.tunnelScrollOffset = 0;
-    
+
     // Material metálico púrpura oscuro brillante para los bloques
     this.blockMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color("#0c021f"), // Púrpura muy oscuro
@@ -382,47 +384,47 @@ export class SimbiotikWebGL {
       transparent: true,
       opacity: 0.0
     });
-    
+
     // Tiras de neón brillantes (fucsia/morado)
     this.neonMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color("#e879f9"), // Fucsia
       transparent: true,
       opacity: 0.0
     });
-    
+
     this.neonPurpleMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color("#c084fc"), // Morado claro
       transparent: true,
       opacity: 0.0
     });
-    
+
     const blockGeo = new THREE.BoxGeometry(0.8, 0.15, 1.85);
     const neonGeo = new THREE.BoxGeometry(0.08, 0.05, 1.87);
-    
+
     // InstancedMesh de 5000 bloques y 5000 neones para rendimiento de 60FPS
     this.blockInstanced = new THREE.InstancedMesh(blockGeo, this.blockMaterial, 5000);
     this.neonInstanced = new THREE.InstancedMesh(neonGeo, this.neonMaterial, 5000);
-    
+
     this.tunnelGroup.add(this.blockInstanced);
     this.tunnelGroup.add(this.neonInstanced);
-    
+
     this.instancedData = [];
     const spacing = 3.0;
     const countZ = 100; // 100 capas Z
     const blocksPerLayer = 50; // 50 bloques por capa = 5000 bloques totales
-    
+
     // Dimensiones gigantes para ocupar toda la pantalla en cualquier relación de aspecto
     const radiusX = 6.8;
     const radiusY = 3.8;
-    
+
     let index = 0;
     for (let l = 0; l < countZ; l++) {
       const zBase = -l * spacing;
-      
+
       for (let b = 0; b < blocksPerLayer; b++) {
         let x = 0, y = 0, rotZ = 0;
         let neonOffsetX = 0;
-        
+
         if (b < 15) {
           // Piso
           const pct = b / 14;
@@ -452,11 +454,11 @@ export class SimbiotikWebGL {
           rotZ = Math.PI / 2;
           neonOffsetX = Math.random() > 0.5 ? 0.3 : -0.3;
         }
-        
+
         // Pequeño desplazamiento aleatorio para un aspecto más orgánico y profundo
         x += (Math.random() - 0.5) * 0.15;
         y += (Math.random() - 0.5) * 0.15;
-        
+
         this.instancedData.push({
           initialX: x,
           initialY: y,
@@ -467,7 +469,7 @@ export class SimbiotikWebGL {
         });
       }
     }
-    
+
     // Esfera blanca luminosa (el centro brillante al fondo)
     const glowGeo = new THREE.SphereGeometry(1.2, 32, 32);
     this.glowMaterial = new THREE.MeshBasicMaterial({
@@ -478,10 +480,10 @@ export class SimbiotikWebGL {
     this.glowMesh = new THREE.Mesh(glowGeo, this.glowMaterial);
     this.glowMesh.position.set(0, 0, -250); // Empujada más al fondo del túnel largo
     this.tunnelGroup.add(this.glowMesh);
-    
+
     // Luces puntuales internas distribuidas a lo largo del túnel gigante
     this.tunnelLights = [];
-    
+
     const colors = [0xd946ef, 0xa855f7, 0x3b82f6];
     for (let k = 0; k < 6; k++) {
       const zLight = -k * 50 - 10;
@@ -492,7 +494,7 @@ export class SimbiotikWebGL {
       this.tunnelGroup.add(light);
       this.tunnelLights.push(light);
     }
-    
+
     const finalWhiteLight = new THREE.PointLight(0xffffff, 10, 80);
     finalWhiteLight.position.set(0, 0, -245);
     finalWhiteLight.initialIntensity = 10.0;
@@ -628,28 +630,28 @@ export class SimbiotikWebGL {
   // Carga de archivo GLTF/GLB y autoescalado para mantener las dimensiones del actual logo
   loadLogoFromGLTF(gltfUrl) {
     const loader = new GLTFLoader();
-    
+
     loader.load(gltfUrl, (gltf) => {
       if (this.logoGroup) {
         this.scene.remove(this.logoGroup);
       }
-      
+
       this.logoMesh = gltf.scene;
-      
+
       const box = new THREE.Box3().setFromObject(this.logoMesh);
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
-      
+
       // La escala objetivo es la misma que la del logo SVG (aprox. 5.5 de dimensión máxima)
-      const targetSize = 5.5; 
+      const targetSize = 5.5;
       const scale = targetSize / maxDim;
       this.logoMesh.scale.set(scale, scale, scale);
-      
+
       const center = box.getCenter(new THREE.Vector3());
       this.logoMesh.position.x = -center.x * scale;
       this.logoMesh.position.y = -center.y * scale;
       this.logoMesh.position.z = -center.z * scale;
-      
+
       this.logoGroup = new THREE.Group();
       this.logoGroup.add(this.logoMesh);
       this.scene.add(this.logoGroup);
@@ -695,8 +697,8 @@ export class SimbiotikWebGL {
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
 
-      // Escalar un 35% más grande (de 5.2 a 7.02 unidades)
-      const targetSize = 5.2 * 1.35;
+      // Escalar aumentado un 10% (5.2 * 1.35 * 0.8 * 0.75 * 1.1)
+      const targetSize = 5.2 * 1.35 * 0.8 * 0.75 * 1.1;
       const scale = targetSize / (maxDim || 1);
       this.slenderWomanMesh.scale.set(scale, scale, scale);
 
@@ -709,8 +711,8 @@ export class SimbiotikWebGL {
       this.slenderWomanGroup = new THREE.Group();
       this.slenderWomanGroup.add(this.slenderWomanMesh);
 
-      // Posición en la escena: en el centro (Z = -0.5)
-      this.slenderWomanGroup.position.set(0, -0.5, -0.5);
+      // Posición en la escena: en el fondo profundo detrás de los contenedores (Z = -3.0)
+      this.slenderWomanGroup.position.set(0, -0.5, -3.0);
       this.slenderWomanGroup.visible = false;
       this.scene.add(this.slenderWomanGroup);
 
@@ -735,6 +737,70 @@ export class SimbiotikWebGL {
     }, undefined, (err) => {
       console.warn("Error al cargar Slender_Woman_Lores.glb:", err);
     });
+  }
+
+  // Interacción de raycasting (hover ilumina modelo, clic despliega contenedores)
+  setupSlenderInteractions() {
+    this.slenderRaycaster = new THREE.Raycaster();
+    this.slenderMouse = new THREE.Vector2();
+
+    const updateMousePos = (e) => {
+      this.slenderMouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      this.slenderMouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    };
+
+    const handlePointerMove = (e) => {
+      if (this.activeSection !== 'dimension-alterna' || !this.slenderWomanMesh) {
+        if (this.isSlenderHovered) {
+          this.isSlenderHovered = false;
+          document.body.style.cursor = 'auto';
+        }
+        return;
+      }
+      updateMousePos(e);
+      this.slenderRaycaster.setFromCamera(this.slenderMouse, this.camera);
+      const intersects = this.slenderRaycaster.intersectObject(this.slenderWomanMesh, true);
+
+      if (intersects.length > 0) {
+        if (!this.isSlenderHovered) {
+          this.isSlenderHovered = true;
+          document.body.style.cursor = 'pointer';
+        }
+      } else {
+        if (this.isSlenderHovered) {
+          this.isSlenderHovered = false;
+          document.body.style.cursor = 'auto';
+        }
+      }
+    };
+
+    const handleClick = (e) => {
+      if (this.activeSection !== 'dimension-alterna' || !this.slenderWomanMesh) return;
+      updateMousePos(e);
+      this.slenderRaycaster.setFromCamera(this.slenderMouse, this.camera);
+      const intersects = this.slenderRaycaster.intersectObject(this.slenderWomanMesh, true);
+
+      if (intersects.length > 0) {
+        this.toggleDimensionContainers();
+      }
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('click', handleClick);
+
+    const triggerBtn = document.getElementById('slender-hint-trigger');
+    if (triggerBtn) {
+      triggerBtn.addEventListener('click', () => {
+        this.toggleDimensionContainers();
+      });
+    }
+  }
+
+  toggleDimensionContainers() {
+    const artGrid = document.querySelector('.dimension-art-grid');
+    if (artGrid) {
+      artGrid.classList.toggle('expanded');
+    }
   }
 
   // Vórtice de líneas de código en azul eléctrico en forma de huracán para la base del modelo 3D en El Manifiesto
@@ -905,16 +971,16 @@ export class SimbiotikWebGL {
   // Carga y extrusión del archivo SVG a 3D con material de Cristal Prismático
   loadLogoFromSVG(svgUrl) {
     const loader = new SVGLoader();
-    
+
     loader.load(svgUrl, (data) => {
       // Remover el placeholder anterior
       if (this.logoGroup) {
         this.scene.remove(this.logoGroup);
       }
-      
+
       const paths = data.paths;
       const group = new THREE.Group();
-      
+
       // Ajustes de extrusión (grosor aumentado a 0.7 para darle presencia 3D sólida)
       const extrudeSettings = {
         depth: 0.7,
@@ -938,7 +1004,7 @@ export class SimbiotikWebGL {
       for (let i = 0; i < paths.length; i++) {
         const path = paths[i];
         const shapes = SVGLoader.createShapes(path);
-        
+
         for (let j = 0; j < shapes.length; j++) {
           const shape = shapes[j];
           const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
@@ -975,26 +1041,26 @@ export class SimbiotikWebGL {
   // Carga de archivo OBJ tradicional con material cristalino
   loadLogoFromOBJ(objUrl) {
     const loader = new OBJLoader();
-    
+
     loader.load(objUrl, (obj) => {
       if (this.logoGroup) {
         this.scene.remove(this.logoGroup);
       }
-      
+
       this.logoMesh = obj;
-      
+
       const box = new THREE.Box3().setFromObject(this.logoMesh);
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       // Escala al doble de tamaño para máxima visualización
       const scale = 2.8 / maxDim;
       this.logoMesh.scale.set(scale, scale, scale);
-      
+
       const center = box.getCenter(new THREE.Vector3());
       this.logoMesh.position.x = -center.x * scale;
       this.logoMesh.position.y = -center.y * scale;
       this.logoMesh.position.z = -center.z * scale;
-      
+
       this.logoGroup = new THREE.Group();
       this.logoGroup.add(this.logoMesh);
       this.scene.add(this.logoGroup);
@@ -1043,7 +1109,7 @@ export class SimbiotikWebGL {
 
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
       this.scene.add(ambientLight);
-      
+
       this.lightsAdded = true;
     }
   }
@@ -1256,7 +1322,7 @@ export class SimbiotikWebGL {
   // Actualizar la paleta de color base e interpolarla
   updateColorTheme(colorHex) {
     const targetColor = new THREE.Color(colorHex);
-    
+
     // Interpolar color base usando GSAP
     gsap.to(this.colorTheme, {
       r: targetColor.r,
@@ -1272,7 +1338,7 @@ export class SimbiotikWebGL {
           colors[i * 3 + 2] = this.colorTheme.b;
         }
         this.particleSystem.geometry.attributes.color.needsUpdate = true;
-        
+
         // Actualizar materiales de los placeholders o del logo
         if (this.logoGroup) {
           this.logoGroup.traverse((child) => {
@@ -1509,7 +1575,7 @@ export class SimbiotikWebGL {
     let targetCamY = 0;
     let targetCamX = 0;
     let targetRotationY = 0;
-    
+
     // Restaurar modo sólido si estaba en partículas
     if (this.logoParticleMode) {
       this.transitionToSolid();
@@ -1528,7 +1594,7 @@ export class SimbiotikWebGL {
     } else {
       this.hideWaterWaves();
     }
-    
+
     switch (sectionId) {
       case 'inicio':
         targetCamZ = 6;
@@ -1556,18 +1622,25 @@ export class SimbiotikWebGL {
         this.logoSpinSpeed = 0.002;
         break;
       case 'simbolo':
-        // Cámara se desplaza a la izquierda para que el logo 3D se vea solo la mitad derecha
-        targetCamZ = 3.5;
-        targetCamX = -3.5;
+        // Logo 3D 100% de frente desplazado a la derecha en la escena (medio círculo frontal perfecto)
+        targetCamZ = 4.5;
+        targetCamX = 0.0;
         targetCamY = 0.0;
-        this.logoSpinSpeed = 0.001;
+        this.logoSpinSpeed = 0.0;
+        break;
+      case 'dimension-alterna':
+        // Fondo de partículas orbitando en tonos grises (centro magnético bajado 300px)
+        targetCamZ = 6.5;
+        targetCamX = 0.0;
+        targetCamY = -1.5;
+        this.logoSpinSpeed = 0.003;
         break;
       case 'manifiesto':
-        // Alejar para mostrar toda la cuadrícula técnica de partículas
+        // Logo 3D totalmente de frente, reducido un 20% y con 0% opacidad
         targetCamZ = 8.5;
         targetCamX = 0.0;
-        targetCamY = -1.0;
-        this.logoSpinSpeed = 0.003;
+        targetCamY = 0.0;
+        this.logoSpinSpeed = 0.0;
         break;
       case 'press-kit':
         // Logo 3D alejado y ubicado en el lado derecho de la pantalla rotando activamente sobre el eje Y
@@ -1621,10 +1694,10 @@ export class SimbiotikWebGL {
 
   animate() {
     requestAnimationFrame(() => this.animate());
-    
+
     // Incrementar variable de tiempo para ondas y ruido
     this.uniforms.uTime.value += 0.012;
-    
+
     // Simular pulsación sónica basada en ruido sinusoidal (mantiene el movimiento dinámico sin MP3)
     const simulatedFreq = Math.abs(Math.sin(this.uniforms.uTime.value * 2.5)) * 0.15 + (Math.random() * 0.03);
     this.uniforms.uAudioFreq.value = simulatedFreq;
@@ -1641,7 +1714,7 @@ export class SimbiotikWebGL {
       const dist = Math.abs(sectionCenter - viewportCenter);
       // Pico en 1.0 al estar centrado, decae a 0.0 si está a más de una pantalla de distancia
       newSectionProgress = Math.max(0.0, 1.0 - (dist / viewHeight));
-      
+
       this.uniforms.uNewSectionProgress.value = newSectionProgress;
 
       // Actualizar opacidad del fondo de galaxias animado en el DOM
@@ -1662,7 +1735,7 @@ export class SimbiotikWebGL {
       if (newSectionProgress > 0) {
         // Movimiento ligero y suave hacia el centro brillante (Z negativo) - 25% más rápido (0.005)
         this.tunnelScrollOffset += 0.005 * (1.0 + simulatedFreq * 0.3);
-        
+
         const spacing = 3.0;
         const totalZ = 300.0; // spacing * countZ = 3.0 * 100 = 300.0
         const maxZ = 0.0;
@@ -1676,18 +1749,18 @@ export class SimbiotikWebGL {
 
         this.instancedData.forEach((data) => {
           let z = data.initialZ - (this.tunnelScrollOffset * spacing);
-          
+
           // Loop circular para mantener el túnel infinito
           z = z % totalZ;
           if (z > maxZ) z -= totalZ;
           if (z < minZ) z += totalZ;
-          
+
           // Bloque
           dummyBlock.position.set(data.initialX, data.initialY, z);
           dummyBlock.rotation.set(0, 0, data.rotZ);
           dummyBlock.updateMatrix();
           this.blockInstanced.setMatrixAt(data.index, dummyBlock.matrix);
-          
+
           // Neon
           let neonX = data.initialX;
           let neonY = data.initialY;
@@ -1726,10 +1799,10 @@ export class SimbiotikWebGL {
       } else {
         // Ocultar túnel completamente fuera de la sección para ahorrar rendimiento
         this.tunnelGroup.visible = false;
-        
+
         this.blockMaterial.opacity = 0;
         this.neonMaterial.opacity = 0;
-        
+
         if (this.glowMesh) {
           this.glowMesh.material.opacity = 0;
         }
@@ -1740,7 +1813,7 @@ export class SimbiotikWebGL {
         }
       }
     }
-    
+
     // El logo 3D permanece visible continuamente en todas las secciones (incluyendo Memoria Natural)
     if (this.logoGroup) {
       this.logoGroup.visible = true;
@@ -1755,7 +1828,7 @@ export class SimbiotikWebGL {
     if (this.logoGroup) {
       const scrollY = window.scrollY || document.documentElement.scrollTop;
       const viewHeight = window.innerHeight;
-      
+
       const simbiosisSec = document.getElementById('simbiosis-sonido');
       let centerScroll = 2.0 * viewHeight;
       if (simbiosisSec) {
@@ -1769,8 +1842,8 @@ export class SimbiotikWebGL {
 
       // Lerp suave de rotaciones X, Y y Z para las secciones Memoria Natural y Agujero Negro
       const isMemoria = (this.activeSection === 'memoria-intro' || this.activeSection === 'memoria-natural');
-      // Ocultar las partículas que caen de arriba a abajo en Agujero Negro, Memoria Natural, El Símbolo, El Manifiesto, Press Kit y Contacto
-      const isHiddenSpiral = (isMemoria || this.activeSection === 'simbolo' || this.activeSection === 'manifiesto' || this.activeSection === 'press-kit' || this.activeSection === 'contacto');
+      // Ocultar las partículas que caen de arriba a abajo en Agujero Negro, Memoria Natural, El Símbolo, Dimensión Alterna, El Manifiesto, Press Kit y Contacto
+      const isHiddenSpiral = (isMemoria || this.activeSection === 'simbolo' || this.activeSection === 'dimension-alterna' || this.activeSection === 'manifiesto' || this.activeSection === 'press-kit' || this.activeSection === 'contacto');
       if (this.spiralSystem) {
         this.spiralSystem.visible = !isHiddenSpiral;
       }
@@ -1791,8 +1864,9 @@ export class SimbiotikWebGL {
       }
 
       const isSimbolo = (this.activeSection === 'simbolo');
+      const isManifiesto = (this.activeSection === 'manifiesto');
       const targetRotX = isMemoria ? ((110 * Math.PI) / 180) : 0;        // 110 grados en X
-      const targetRotYOffset = isMemoria ? ((100 * Math.PI) / 180) : (isSimbolo ? ((50 * Math.PI) / 180) : 0); // 50 grados en Y para El Símbolo
+      const targetRotYOffset = isMemoria ? ((100 * Math.PI) / 180) : ((isSimbolo || isManifiesto) ? ((50 * Math.PI) / 180) : 0); // 50 grados en Y para El Símbolo y Manifiesto
       const targetRotZ = isMemoria ? (-Math.PI / 10) : 0;              // Inclinación diagonal previa (-18 deg)
 
       // Escalar la profundidad Z al 25% (0.25) únicamente en la sección Memoria Natural
@@ -1809,23 +1883,39 @@ export class SimbiotikWebGL {
       this.currentLogoScaleZ += (targetScaleZ - this.currentLogoScaleZ) * 0.05;
 
       const isContacto = (this.activeSection === 'contacto');
-      if (isContacto) {
-        // En sección Contacto: alinear el logo 3D 100% de frente (sin inclinación X/Z ni giro Y)
+      const isManifiestoSection = (this.activeSection === 'manifiesto');
+      const isSimboloSection = (this.activeSection === 'simbolo');
+      if (isContacto || isManifiestoSection || isSimboloSection) {
+        // En Contacto, Manifiesto y El Símbolo: alinear el logo 3D 100% de frente (sin inclinación X/Z ni giro Y)
         const idealY = baseRotY + this.currentLogoRotYOffset;
         const targetFrontY = Math.round(idealY / (Math.PI * 2)) * Math.PI * 2;
         if (this.contactoRotY === undefined) this.contactoRotY = idealY;
         this.contactoRotY += (targetFrontY - this.contactoRotY) * 0.08;
 
+        const simboloYAngle = isSimboloSection ? ((-28 * Math.PI) / 180) : 0;
         this.logoGroup.rotation.x += (0 - this.logoGroup.rotation.x) * 0.08;
-        this.logoGroup.rotation.y = this.contactoRotY;
+        this.logoGroup.rotation.y = this.contactoRotY + simboloYAngle;
         this.logoGroup.rotation.z += (0 - this.logoGroup.rotation.z) * 0.08;
-        this.logoGroup.scale.set(1.0, 1.0, 1.0);
+
+        // En Manifiesto: reducir tamaño un 20% (escala 0.8), en El Símbolo: aumentar un 20% (escala 1.2)
+        const targetScale = isManifiestoSection ? 0.8 : (isSimboloSection ? 1.2 : 1.0);
+        this.logoGroup.scale.set(targetScale, targetScale, targetScale);
+
+        // Posicionamiento X del logo en El Símbolo (desplazado 10px hacia la derecha)
+        const targetLogoX = isSimboloSection ? 4.3 : 0.0;
+        if (this.currentLogoPosX === undefined) this.currentLogoPosX = 0.0;
+        this.currentLogoPosX += (targetLogoX - this.currentLogoPosX) * 0.08;
+        this.logoGroup.position.x = this.currentLogoPosX;
       } else {
         this.contactoRotY = undefined;
         this.logoGroup.rotation.y = baseRotY + this.currentLogoRotYOffset + this.pressKitYSpin;
         this.logoGroup.rotation.x = this.currentLogoRotX;
         this.logoGroup.rotation.z = this.currentLogoRotZ + this.memoriaZSpin;
         this.logoGroup.scale.set(1.0, 1.0, this.currentLogoScaleZ);
+
+        if (this.currentLogoPosX === undefined) this.currentLogoPosX = 0.0;
+        this.currentLogoPosX += (0.0 - this.currentLogoPosX) * 0.08;
+        this.logoGroup.position.x = this.currentLogoPosX;
       }
 
       // Animar el texto de la sección Simbiosis: entra por la izquierda, se centra perfecto y sale rápidamente por la derecha
@@ -1833,7 +1923,7 @@ export class SimbiotikWebGL {
       if (simbiosisTitle) {
         // Desfase normalizado respecto al centro magnético exacto (-1 al inicio, 0 al centro, +1 al final)
         const offset = (scrollY - centerScroll) / viewHeight;
-        
+
         let shiftX = 0;
         let opacity = 0;
 
@@ -1910,39 +2000,15 @@ export class SimbiotikWebGL {
         }
       }
 
-      // Calcular desvanecimiento gradual del Logotipo 3D al entrar, estar y salir de la sección Manifiesto
-      const manifiestoSec = document.getElementById('manifiesto');
-      let manifiestoFadeProgress = 1.0;
-
-      if (manifiestoSec) {
-        const rect = manifiestoSec.getBoundingClientRect();
-        const vh = window.innerHeight;
-        const fadeZone = Math.min(350, vh * 0.45);
-
-        if (rect.top < vh && rect.top > vh - fadeZone) {
-          // Entrada a Manifiesto desvaneciéndose progresivamente de 1.0 a 0.0
-          const t = (rect.top - (vh - fadeZone)) / fadeZone;
-          manifiestoFadeProgress = 0.5 - 0.5 * Math.cos(t * Math.PI);
-        } else if (rect.top <= vh - fadeZone && rect.bottom >= fadeZone) {
-          // Ocultar totalmente dentro de la sección Manifiesto
-          manifiestoFadeProgress = 0.0;
-        } else if (rect.bottom < fadeZone && rect.bottom > 0) {
-          // Salida de Manifiesto reapareciendo progresivamente de 0.0 a 1.0
-          const t = (fadeZone - rect.bottom) / fadeZone;
-          manifiestoFadeProgress = 0.5 - 0.5 * Math.cos(t * Math.PI);
-        } else {
-          manifiestoFadeProgress = 1.0;
-        }
-      }
-
-      // Opacidad combinada final del logotipo 3D
-      const combinedLogoProgress = Math.min(logoCenterProgress, manifiestoFadeProgress);
+      // Opacidad combinada final del logotipo 3D (oculto al 0% en Dimensión Alterna y El Manifiesto)
+      let sectionFadeProgress = (this.activeSection === 'dimension-alterna' || this.activeSection === 'manifiesto') ? 0.0 : 1.0;
+      const combinedLogoProgress = Math.min(logoCenterProgress, sectionFadeProgress);
 
       // Aplicar visibilidad y opacidad al Logotipo 3D
       if (this.logoGroup) {
         this.logoGroup.visible = this.isLogoVisible && (combinedLogoProgress > 0.001);
 
-        // Actualizar propiedades físicas del material para la sección Contacto o fundir a metal cromo brillante
+        // Actualizar propiedades físicas del material para Contacto o fundir a metal cromo brillante (igual a El Símbolo)
         const isContacto = (this.activeSection === 'contacto');
         const grayColor = new THREE.Color("#71717a");
 
@@ -1960,16 +2026,16 @@ export class SimbiotikWebGL {
                 mat.roughness = 0.3;
                 mat.clearcoat = 0.5;
               } else {
-                // Transición a cromo pulido líquido en el reverso
+                // Transición a cromo pulido líquido en el reverso y cristal prismático
                 mat.metalness = goldFactor; // 0.0 en el frente (vidrio), 1.0 al reverso (metal cromo)
                 mat.transmission = 1.0 - goldFactor; // 1.0 en el frente (transparente), 0.0 al reverso (opaco)
                 mat.roughness = 0.1 * goldFactor + 0.0 * (1.0 - goldFactor); // 0.1 para reflejos satinados metálicos suaves
                 mat.clearcoat = goldFactor * 1.0; // Capa de laca brillante líquida
                 mat.clearcoatRoughness = 0.02; // Reflejo secundario nítido
-                mat.opacity = (0.4 + goldFactor * 0.6) * combinedLogoProgress; // Desaparece al 0% en Manifiesto y centro magnético
+                mat.opacity = (0.4 + goldFactor * 0.6) * combinedLogoProgress; // Desaparece al 0% en centro magnético
                 mat.transparent = true;
                 mat.thickness = 2.5 * (1.0 - goldFactor);
-                
+
                 // Interpolar color al blanco cromo brillante
                 const chromeColor = new THREE.Color("#ffffff");
                 mat.color.copy(this.colorTheme).lerp(chromeColor, goldFactor);
@@ -1985,40 +2051,62 @@ export class SimbiotikWebGL {
         });
       }
 
-      // Modelo 3D Slender Woman: únicamente activo en la sección Manifiesto, oculto en Press Kit y demás secciones
-      const isManifiestoOnly = (this.activeSection === 'manifiesto');
-      const slenderOpacityProgress = 1.0 - manifiestoFadeProgress;
+      // Modelo 3D Slender Woman: únicamente activo en la sección Dimensión Alterna (centrado en el fondo)
+      const isDimensionAlterna = (this.activeSection === 'dimension-alterna');
 
       if (this.slenderWomanGroup) {
-        this.slenderWomanGroup.visible = isManifiestoOnly && (slenderOpacityProgress > 0.001);
+        if (this.slenderWomanMesh) {
+          const slenderBaseColor = new THREE.Color("#b87fbc");
+          const slenderGlowColor = new THREE.Color("#f472b6"); // Magenta/fucsia luminoso al hacer hover
+          const targetColor = (isDimensionAlterna && this.isSlenderHovered) ? slenderGlowColor : slenderBaseColor;
+          const targetOpacity = (isDimensionAlterna && this.isSlenderHovered) ? 0.95 : (isDimensionAlterna ? 0.3 : 0.0);
+
+          let maxMeshOpacity = 0.0;
+
+          this.slenderWomanMesh.traverse((child) => {
+            if (child.isMesh && child.material) {
+              // Interpolación lerp suave al 5% para un desvanecimiento fluido de entrada y salida
+              child.material.opacity += (targetOpacity - child.material.opacity) * 0.05;
+              child.material.transparent = true;
+              child.material.color.lerp(targetColor, 0.08);
+              if (child.material.emissive) {
+                const emissiveTarget = (isDimensionAlterna && this.isSlenderHovered) ? new THREE.Color("#e879f9") : new THREE.Color("#000000");
+                child.material.emissive.lerp(emissiveTarget, 0.08);
+                child.material.emissiveIntensity = (isDimensionAlterna && this.isSlenderHovered) ? 0.8 : 0.0;
+              }
+              if (child.material.opacity > maxMeshOpacity) {
+                maxMeshOpacity = child.material.opacity;
+              }
+            }
+          });
+
+          // Mantener visible la geometría hasta que la opacidad se haya desvanecido totalmente a 0
+          this.slenderWomanGroup.visible = (maxMeshOpacity > 0.005);
+        } else {
+          this.slenderWomanGroup.visible = isDimensionAlterna;
+        }
+
         if (this.slenderWomanGroup.visible) {
+          // Centrado vertical respecto a la cámara y ubicado en el fondo profundo detrás de los contenedores (Z = -3.0)
+          this.slenderWomanGroup.position.y = this.camera.position.y;
+          this.slenderWomanGroup.position.z = -3.0;
           // Rotación sutil y fluida sobre el eje Y
           this.slenderWomanGroup.rotation.y += 0.003;
         }
-
-        if (this.slenderWomanMesh) {
-          const slenderColor = new THREE.Color("#b87fbc");
-          this.slenderWomanMesh.traverse((child) => {
-            if (child.isMesh && child.material) {
-              child.material.opacity = isManifiestoOnly ? (0.85 * slenderOpacityProgress) : 0;
-              child.material.transparent = true;
-              child.material.color.copy(slenderColor);
-            }
-          });
-        }
       }
 
-      // Vórtice giratorio de líneas de código azul en la base del modelo 3D en El Manifiesto
+      // Vórtice giratorio de líneas de código azul en la base (únicamente en El Manifiesto)
+      const isManifiestoSec = (this.activeSection === 'manifiesto');
       if (this.codeVortexGroup && this.codeVortexMaterial) {
-        this.codeVortexGroup.visible = (slenderOpacityProgress > 0.001);
+        this.codeVortexGroup.visible = isManifiestoSec;
         if (this.codeVortexGroup.visible) {
           this.codeVortexMaterial.uniforms.uTime.value += 0.016;
-          this.codeVortexMaterial.uniforms.uVortexOpacity.value = slenderOpacityProgress;
+          this.codeVortexMaterial.uniforms.uVortexOpacity.value = 1.0;
           this.codeVortexGroup.rotation.z += 0.004; // Giro helicoidal constante del vórtice de código
         }
       }
     }
-    
+
     // Animar partículas del logo (descomposición en perlas)
     if (this.logoParticles && this.logoParticles.material.uniforms) {
       this.logoParticles.material.uniforms.uTime.value += 0.016;
@@ -2042,23 +2130,6 @@ export class SimbiotikWebGL {
       this.waterWaves.rotation.z += (targetRotZ - this.waterWaves.rotation.z) * 0.05;
     }
 
-    // Carrusel horizontal del manifiesto: las tarjetas se deslizan de derecha a izquierda con el scroll
-    const manifiestoSection = document.getElementById('manifiesto');
-    const manifiestoGrid = document.getElementById('manifiesto-items-container');
-    if (manifiestoSection && manifiestoGrid) {
-      const rect = manifiestoSection.getBoundingClientRect();
-      const viewH = window.innerHeight;
-      const sectionH = rect.height;
-      const offset = rect.top;
-      const scrollable = sectionH - viewH;
-      let progress = 0;
-      if (scrollable > 0) {
-        progress = Math.max(0, Math.min(1, (-offset) / scrollable));
-      }
-      const gridWidth = manifiestoGrid.scrollWidth;
-      const maxTranslate = Math.max(0, gridWidth - window.innerWidth + 48);
-      manifiestoGrid.style.transform = `translateX(${-maxTranslate * progress}px)`;
-    }
 
     if (this.outerRing) {
       this.outerRing.rotation.z -= 0.004;
